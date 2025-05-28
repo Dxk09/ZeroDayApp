@@ -229,10 +229,14 @@ if st.button("🚀 Start Training", type="primary"):
             
             # Update live chart every 10 epochs
             if epoch % 10 == 0 or epoch == total_epochs:
-                with chart_container.container():
-                    viz = VisualizationUtils()
-                    fig = viz.plot_training_history(training_history, "Live Training Progress")
-                    st.plotly_chart(fig, use_container_width=True)
+                try:
+                    with chart_container.container():
+                        viz = VisualizationUtils()
+                        fig = viz.plot_training_history(training_history, "Live Training Progress")
+                        st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    # Continue training even if visualization fails
+                    pass
         
         # Start training
         try:
