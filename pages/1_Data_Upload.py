@@ -89,17 +89,53 @@ if data_source == "📚 Use Built-in KDD Cup Dataset":
                 dataset_name = f"KDD_{dataset_choice.split('(')[1].replace(')', '').strip()}"
                 st.session_state.datasets[dataset_name] = df
                 
-                st.success(f"✅ KDD dataset loaded successfully: {len(df)} records with {len(df.columns)} features")
+                # Automatically process for training
+                with st.spinner("Processing KDD dataset for training..."):
+                    # Separate features and target
+                    X = df.drop('attack_type', axis=1)
+                    y = df['attack_type']
+                    
+                    # Convert categorical columns to numeric
+                    from sklearn.preprocessing import LabelEncoder
+                    label_encoders = {}
+                    
+                    for col in X.select_dtypes(include=['object']).columns:
+                        le = LabelEncoder()
+                        X[col] = le.fit_transform(X[col].astype(str))
+                        label_encoders[col] = le
+                    
+                    # Create binary labels (0=normal, 1=anomaly)
+                    y_binary = (y != 'normal').astype(int)
+                    
+                    # Store processed data ready for training
+                    processed_data = {
+                        'X': X,
+                        'y': y_binary,
+                        'feature_names': list(X.columns),
+                        'original_target': y,
+                        'preprocessing_config': {
+                            'target_column': 'attack_type',
+                            'label_encoders': label_encoders,
+                            'dataset_type': 'KDD_Cup_1999'
+                        }
+                    }
+                    
+                    processed_name = f"{dataset_name}_processed"
+                    st.session_state.datasets[processed_name] = processed_data
+                
+                st.success(f"✅ KDD dataset loaded and processed: {len(df)} records ready for training!")
+                st.info("🎯 **Ready for Model Training!** Go to the Model Training page to start building your anomaly detection models.")
                 
                 # Show basic stats
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     st.metric("Total Records", len(df))
                 with col2:
-                    st.metric("Features", len(df.columns) - 1)  # Exclude target
+                    st.metric("Features", len(X.columns))  # Use processed features
                 with col3:
-                    attack_types = df['attack_type'].nunique()
-                    st.metric("Attack Types", attack_types)
+                    normal_count = int(np.sum(y_binary == 0))
+                    anomaly_count = int(np.sum(y_binary == 1))
+                    st.metric("Normal/Anomaly", f"{normal_count:,}/{anomaly_count:,}")
                 
                 # Show attack distribution
                 st.subheader("Attack Type Distribution")
