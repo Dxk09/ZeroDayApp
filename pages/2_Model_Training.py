@@ -417,40 +417,147 @@ if st.button("🚀 Start Training", type="primary"):
 
 # Model comparison section
 if len(st.session_state.models) > 1:
-    st.header("6. Model Comparison")
+    st.header("6. Model Comparison & Accuracy Analysis")
     
-    # Select models to compare
-    models_to_compare = st.multiselect(
-        "Select models to compare:",
-        options=list(st.session_state.models.keys()),
-        default=list(st.session_state.models.keys())[:3]
+    # User option to enable comparison
+    show_comparison = st.checkbox(
+        "🔍 Compare model accuracy and performance", 
+        value=True,
+        help="Enable detailed comparison between your trained models to see accuracy differences"
     )
     
-    if len(models_to_compare) > 1:
-        # Compare metrics
-        evaluator = ModelEvaluator()
-        comparison_data = {}
+    if show_comparison:
+        # Select models to compare
+        models_to_compare = st.multiselect(
+            "Select models to compare:",
+            options=list(st.session_state.models.keys()),
+            default=list(st.session_state.models.keys())[:3],
+            help="Choose which models you want to compare for accuracy analysis"
+        )
         
-        for model_name in models_to_compare:
-            model_info = st.session_state.models[model_name]
-            if 'test_results' in model_info:
-                results = model_info['test_results']
-                comparison_data[model_name] = {
-                    'accuracy': results['accuracy'],
-                    'precision': results['classification_report']['1']['precision'],
-                    'recall': results['classification_report']['1']['recall'],
-                    'f1_score': results['classification_report']['1']['f1-score'],
-                    'auc_score': results['auc_score']
-                }
-        
-        if comparison_data:
-            # Radar chart comparison
-            fig_comparison = evaluator.compare_models(comparison_data)
-            st.plotly_chart(fig_comparison, use_container_width=True)
+        if len(models_to_compare) > 1:
+            # Compare metrics
+            evaluator = ModelEvaluator()
+            comparison_data = {}
+            model_types = {}
             
-            # Metrics table
-            comparison_df = pd.DataFrame(comparison_data).T
-            st.dataframe(comparison_df.round(3))
+            for model_name in models_to_compare:
+                model_info = st.session_state.models[model_name]
+                if 'test_results' in model_info:
+                    results = model_info['test_results']
+                    
+                    # Handle different key formats for classification report
+                    anomaly_key = '1' if '1' in results['classification_report'] else 1
+                    normal_key = '0' if '0' in results['classification_report'] else 0
+                    
+                    comparison_data[model_name] = {
+                        'accuracy': results['accuracy'],
+                        'precision': results['classification_report'][anomaly_key]['precision'],
+                        'recall': results['classification_report'][anomaly_key]['recall'],
+                        'f1_score': results['classification_report'][anomaly_key]['f1-score'],
+                        'auc_score': results.get('auc_score', 0)
+                    }
+                    
+                    # Determine model type
+                    config = model_info.get('config', {})
+                    if 'num_hidden_layers' in config:
+                        model_types[model_name] = "ANN"
+                    else:
+                        model_types[model_name] = "OCSVM"
+            
+            if comparison_data:
+                # Accuracy comparison highlight
+                st.subheader("🎯 Accuracy Comparison")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    # Best performing model
+                    best_model = max(comparison_data.keys(), key=lambda x: comparison_data[x]['accuracy'])
+                    best_accuracy = comparison_data[best_model]['accuracy']
+                    st.metric(
+                        "🏆 Best Accuracy", 
+                        f"{best_accuracy:.3f}",
+                        f"{model_types.get(best_model, 'Unknown')} - {best_model}"
+                    )
+                
+                with col2:
+                    # Average accuracy
+                    avg_accuracy = np.mean([data['accuracy'] for data in comparison_data.values()])
+                    st.metric("📊 Average Accuracy", f"{avg_accuracy:.3f}")
+                
+                with col3:
+                    # Accuracy range
+                    min_acc = min([data['accuracy'] for data in comparison_data.values()])
+                    max_acc = max([data['accuracy'] for data in comparison_data.values()])
+                    accuracy_range = max_acc - min_acc
+                    st.metric("📈 Accuracy Range", f"{accuracy_range:.3f}")
+                
+                # Model type performance breakdown
+                st.subheader("🤖 Performance by Model Type")
+                
+                ann_models = [name for name, type_name in model_types.items() if type_name == "ANN"]
+                ocsvm_models = [name for name, type_name in model_types.items() if type_name == "OCSVM"]
+                
+                if ann_models and ocsvm_models:
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        ann_accuracies = [comparison_data[name]['accuracy'] for name in ann_models]
+                        avg_ann_acc = np.mean(ann_accuracies)
+                        st.success(f"🧠 **ANN Models**: {avg_ann_acc:.3f} avg accuracy ({len(ann_models)} models)")
+                        for name in ann_models:
+                            st.write(f"  • {name}: {comparison_data[name]['accuracy']:.3f}")
+                    
+                    with col2:
+                        ocsvm_accuracies = [comparison_data[name]['accuracy'] for name in ocsvm_models]
+                        avg_ocsvm_acc = np.mean(ocsvm_accuracies)
+                        st.info(f"🔧 **OCSVM Models**: {avg_ocsvm_acc:.3f} avg accuracy ({len(ocsvm_models)} models)")
+                        for name in ocsvm_models:
+                            st.write(f"  • {name}: {comparison_data[name]['accuracy']:.3f}")
+                    
+                    # Performance comparison insight
+                    if avg_ann_acc > avg_ocsvm_acc:
+                        diff = avg_ann_acc - avg_ocsvm_acc
+                        st.info(f"💡 **Insight**: ANN models perform {diff:.3f} better on average for your dataset")
+                    elif avg_ocsvm_acc > avg_ann_acc:
+                        diff = avg_ocsvm_acc - avg_ann_acc
+                        st.info(f"💡 **Insight**: OCSVM models perform {diff:.3f} better on average for your dataset")
+                    else:
+                        st.info("💡 **Insight**: Both model types perform similarly on your dataset")
+                
+                # Radar chart comparison
+                fig_comparison = evaluator.compare_models(comparison_data)
+                st.plotly_chart(fig_comparison, use_container_width=True)
+                
+                # Detailed metrics table with highlighting
+                st.subheader("📋 Detailed Performance Metrics")
+                comparison_df = pd.DataFrame(comparison_data).T
+                comparison_df['Model Type'] = [model_types.get(name, 'Unknown') for name in comparison_df.index]
+                
+                # Reorder columns
+                columns = ['Model Type'] + [col for col in comparison_df.columns if col != 'Model Type']
+                comparison_df = comparison_df[columns]
+                
+                # Style the dataframe to highlight best performers
+                def highlight_best(s):
+                    if s.name in ['accuracy', 'precision', 'recall', 'f1_score', 'auc_score']:
+                        is_max = s == s.max()
+                        return ['background-color: #d4edda' if v else '' for v in is_max]
+                    return ['' for _ in s]
+                
+                styled_df = comparison_df.round(3).style.apply(highlight_best)
+                st.dataframe(styled_df, use_container_width=True)
+                
+                # Download comparison report
+                if st.button("📥 Download Comparison Report"):
+                    comparison_csv = comparison_df.round(3).to_csv()
+                    st.download_button(
+                        label="💾 Download CSV",
+                        data=comparison_csv,
+                        file_name=f"model_comparison_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv"
+                    )
 
 # Available models sidebar
 with st.sidebar:
