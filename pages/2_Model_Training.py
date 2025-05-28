@@ -20,6 +20,13 @@ st.set_page_config(
 st.title("🧠 Model Training")
 st.markdown("Train deep neural network models for zero-day anomaly detection.")
 
+# Initialize session state
+if 'datasets' not in st.session_state:
+    st.session_state.datasets = {}
+
+if 'models' not in st.session_state:
+    st.session_state.models = {}
+
 # Check if processed datasets are available
 processed_datasets = {
     name: data for name, data in st.session_state.datasets.items() 

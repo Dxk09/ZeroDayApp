@@ -14,21 +14,140 @@ st.set_page_config(
 st.title("📊 Data Upload & Preprocessing")
 st.markdown("Upload and preprocess your cybersecurity datasets for anomaly detection training.")
 
-# Initialize data processor
+# Initialize session state
 if 'data_processor' not in st.session_state:
     st.session_state.data_processor = CyberSecurityDataProcessor()
 
-# File upload section
-st.header("1. Upload Dataset")
+if 'datasets' not in st.session_state:
+    st.session_state.datasets = {}
 
-col1, col2 = st.columns([2, 1])
+# Data source selection
+st.header("1. Choose Data Source")
 
-with col1:
-    uploaded_file = st.file_uploader(
-        "Choose a file",
-        type=['csv', 'xlsx', 'xls', 'json'],
-        help="Upload CSV, Excel, or JSON files containing cybersecurity data"
-    )
+data_source = st.radio(
+    "Select your data source:",
+    ["📚 Use Built-in KDD Cup Dataset", "📤 Upload Custom File"],
+    help="Choose between ready-to-use KDD Cup datasets or upload your own cybersecurity data"
+)
+
+if data_source == "📚 Use Built-in KDD Cup Dataset":
+    st.subheader("🎯 KDD Cup 1999 - Network Intrusion Detection Dataset")
+    
+    # Dataset selection
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        dataset_choice = st.selectbox(
+            "Select KDD dataset:",
+            ["KDD Cup 1999 (Training)", "KDD Cup 1999 (Testing)"],
+            help="Training set for model development, Testing set for final evaluation"
+        )
+        
+        # Show dataset information
+        if dataset_choice == "KDD Cup 1999 (Training)":
+            st.info("📊 **125,974 network connection records** with 41 features including protocol, service, duration, and network statistics")
+            st.info("🎯 **23 different attack types** including DoS, R2L, U2R, and Probe categories")
+            dataset_file = "attached_assets/KDDTrain+ copy.txt"
+        else:
+            st.info("📊 **22,545 test records** for model evaluation and validation")
+            st.info("🎯 **Contains unknown attack types** perfect for zero-day detection testing")
+            dataset_file = "attached_assets/KDDTest+ copy.txt"
+    
+    with col2:
+        st.write("**Dataset Features:**")
+        st.write("• Duration, Protocol, Service")
+        st.write("• Network traffic statistics")
+        st.write("• Host-based features") 
+        st.write("• Content features")
+        st.write("• Attack type labels")
+    
+    # Load KDD dataset
+    if st.button("🚀 Load KDD Dataset", type="primary"):
+        with st.spinner("Loading KDD dataset..."):
+            try:
+                # Define column names for KDD dataset
+                kdd_columns = [
+                    'duration', 'protocol_type', 'service', 'flag', 'src_bytes', 'dst_bytes',
+                    'land', 'wrong_fragment', 'urgent', 'hot', 'num_failed_logins', 'logged_in',
+                    'num_compromised', 'root_shell', 'su_attempted', 'num_root', 'num_file_creations',
+                    'num_shells', 'num_access_files', 'num_outbound_cmds', 'is_host_login',
+                    'is_guest_login', 'count', 'srv_count', 'serror_rate', 'srv_serror_rate',
+                    'rerror_rate', 'srv_rerror_rate', 'same_srv_rate', 'diff_srv_rate',
+                    'srv_diff_host_rate', 'dst_host_count', 'dst_host_srv_count',
+                    'dst_host_same_srv_rate', 'dst_host_diff_srv_rate', 'dst_host_same_src_port_rate',
+                    'dst_host_srv_diff_host_rate', 'dst_host_serror_rate', 'dst_host_srv_serror_rate',
+                    'dst_host_rerror_rate', 'dst_host_srv_rerror_rate', 'attack_type', 'difficulty'
+                ]
+                
+                # Load the dataset
+                df = pd.read_csv(dataset_file, names=kdd_columns, header=None)
+                
+                # Remove difficulty column (not needed for detection)
+                df = df.drop('difficulty', axis=1)
+                
+                # Store in session state
+                dataset_name = f"KDD_{dataset_choice.split('(')[1].replace(')', '').strip()}"
+                st.session_state.datasets[dataset_name] = df
+                
+                st.success(f"✅ KDD dataset loaded successfully: {len(df)} records with {len(df.columns)} features")
+                
+                # Show basic stats
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Records", len(df))
+                with col2:
+                    st.metric("Features", len(df.columns) - 1)  # Exclude target
+                with col3:
+                    attack_types = df['attack_type'].nunique()
+                    st.metric("Attack Types", attack_types)
+                
+                # Show attack distribution
+                st.subheader("Attack Type Distribution")
+                attack_counts = df['attack_type'].value_counts().head(10)
+                
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    fig = px.bar(
+                        x=attack_counts.index,
+                        y=attack_counts.values,
+                        title="Top 10 Attack Types",
+                        labels={'x': 'Attack Type', 'y': 'Count'}
+                    )
+                    fig.update_xaxes(tickangle=45)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # Binary classification stats
+                    normal_count = (df['attack_type'] == 'normal').sum()
+                    attack_count = len(df) - normal_count
+                    
+                    st.metric("Normal Traffic", f"{normal_count:,}")
+                    st.metric("Attack Traffic", f"{attack_count:,}")
+                    anomaly_rate = (attack_count / len(df)) * 100
+                    st.metric("Anomaly Rate", f"{anomaly_rate:.1f}%")
+                
+                uploaded_file = None  # Set to None since we're using built-in data
+                
+            except Exception as e:
+                st.error(f"Error loading KDD dataset: {str(e)}")
+                uploaded_file = None
+
+else:
+    # File upload section
+    st.header("Upload Custom Dataset")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        uploaded_file = st.file_uploader(
+            "Choose a file",
+            type=['csv', 'xlsx', 'xls', 'json'],
+            help="Upload CSV, Excel, or JSON files containing cybersecurity data"
+        )
+
+# Initialize uploaded_file if it doesn't exist
+if 'uploaded_file' not in locals():
+    uploaded_file = None
 
 with col2:
     if uploaded_file:
