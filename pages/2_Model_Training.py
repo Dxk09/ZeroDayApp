@@ -265,11 +265,13 @@ if st.button("🚀 Start Training", type="primary"):
             with col1:
                 st.metric("Accuracy", f"{test_results['accuracy']:.3f}")
             with col2:
-                st.metric("Precision", f"{test_results['classification_report']['1']['precision']:.3f}")
+                # Handle different key formats for classification report
+                anomaly_key = '1' if '1' in test_results['classification_report'] else 1
+                st.metric("Precision", f"{test_results['classification_report'][anomaly_key]['precision']:.3f}")
             with col3:
-                st.metric("Recall", f"{test_results['classification_report']['1']['recall']:.3f}")
+                st.metric("Recall", f"{test_results['classification_report'][anomaly_key]['recall']:.3f}")
             with col4:
-                st.metric("F1-Score", f"{test_results['classification_report']['1']['f1-score']:.3f}")
+                st.metric("F1-Score", f"{test_results['classification_report'][anomaly_key]['f1-score']:.3f}")
             
             # Visualizations
             col1, col2 = st.columns(2)
