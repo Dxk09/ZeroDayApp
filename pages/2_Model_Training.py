@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from sklearn.model_selection import train_test_split
 from models.anomaly_detector import AnomalyDetectionModel
+from models.ocsvm_detector import OCSDVMDetector
 from utils.model_evaluation import ModelEvaluator
 from utils.visualization import VisualizationUtils
 import plotly.graph_objects as go
@@ -69,62 +70,109 @@ if selected_dataset:
             st.write(f"- Normal: {normal_count} ({normal_count/len(data['y']):.1%})")
             st.write(f"- Anomaly: {anomaly_count} ({anomaly_count/len(data['y']):.1%})")
 
+# Model type selection
+st.header("2. Model Type Selection")
+
+model_type = st.selectbox(
+    "Choose anomaly detection algorithm:",
+    options=["Deep Neural Network (ANN)", "One-Class SVM (OCSVM)"],
+    help="ANN: Deep learning approach, good for complex patterns. OCSVM: Classical ML, faster training, works well with normal data only."
+)
+
 # Model configuration
-st.header("2. Model Configuration")
+st.header("3. Model Configuration")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("🏗️ Architecture")
+    if model_type == "Deep Neural Network (ANN)":
+        st.subheader("🏗️ Architecture")
+        
+        # Get number of input features
+        num_input_units = data['X'].shape[1]
+        st.info(f"Input features: {num_input_units}")
+        
+        num_hidden_layers = st.slider(
+            "Number of hidden layers",
+            min_value=1, max_value=10, value=4,
+            help="Number of hidden layers in the neural network"
+        )
+        
+        num_units_per_layer = st.slider(
+            "Units per hidden layer",
+            min_value=4, max_value=512, value=64,
+            help="Number of neurons in each hidden layer"
+        )
     
-    # Get number of input features
-    num_input_units = data['X'].shape[1]
-    st.info(f"Input features: {num_input_units}")
-    
-    num_hidden_layers = st.slider(
-        "Number of hidden layers",
-        min_value=1, max_value=10, value=4,
-        help="Number of hidden layers in the neural network"
-    )
-    
-    num_units_per_layer = st.slider(
-        "Units per hidden layer",
-        min_value=4, max_value=512, value=64,
-        help="Number of neurons in each hidden layer"
-    )
+    else:  # OCSVM
+        st.subheader("🔧 OCSVM Configuration")
+        
+        # Get number of input features
+        num_input_units = data['X'].shape[1]
+        st.info(f"Input features: {num_input_units}")
+        
+        kernel = st.selectbox(
+            "Kernel type",
+            options=['rbf', 'linear', 'poly', 'sigmoid'],
+            help="RBF: Good for non-linear patterns. Linear: Fast, works for linearly separable data."
+        )
+        
+        gamma = st.selectbox(
+            "Gamma parameter",
+            options=['scale', 'auto', 0.001, 0.01, 0.1, 1.0],
+            index=0,
+            help="Controls influence of single training example. 'scale' is usually good."
+        )
+        
+        nu = st.slider(
+            "Nu parameter",
+            min_value=0.01, max_value=0.5, value=0.05, step=0.01,
+            help="Expected fraction of outliers in training data (0.05 = 5%)"
+        )
 
 with col2:
     st.subheader("⚙️ Training Parameters")
     
-    num_epochs = st.slider(
-        "Number of epochs",
-        min_value=10, max_value=5000, value=1000,
-        help="Number of training iterations"
-    )
+    if model_type == "Deep Neural Network (ANN)":
+        num_epochs = st.slider(
+            "Number of epochs",
+            min_value=10, max_value=5000, value=1000,
+            help="Number of training iterations"
+        )
+        
+        batch_size = st.selectbox(
+            "Batch size",
+            options=[8, 16, 32, 64, 128],
+            index=2,
+            help="Number of samples per training batch"
+        )
+        
+        learning_rate = st.selectbox(
+            "Learning rate",
+            options=[0.0001, 0.001, 0.01, 0.1],
+            index=1,
+            format_func=lambda x: f"{x:.4f}",
+            help="Learning rate for the optimizer"
+        )
+        
+        patience = st.slider(
+            "Early stopping patience",
+            min_value=10, max_value=200, value=50,
+            help="Number of epochs to wait for improvement before stopping"
+        )
     
-    batch_size = st.selectbox(
-        "Batch size",
-        options=[8, 16, 32, 64, 128],
-        index=2,
-        help="Number of samples per training batch"
-    )
-    
-    learning_rate = st.selectbox(
-        "Learning rate",
-        options=[0.0001, 0.001, 0.01, 0.1],
-        index=1,
-        format_func=lambda x: f"{x:.4f}",
-        help="Learning rate for the optimizer"
-    )
-    
-    patience = st.slider(
-        "Early stopping patience",
-        min_value=10, max_value=200, value=50,
-        help="Number of epochs to wait for improvement before stopping"
-    )
+    else:  # OCSVM
+        st.info("OCSVM trains automatically - no additional parameters needed!")
+        st.write("**Training approach:**")
+        st.write("- Uses only normal data for training")
+        st.write("- No epochs or batches required")
+        st.write("- Fast convergence with optimization")
+        
+        # Add note about data usage
+        st.warning("⚠️ OCSVM works best when trained only on normal (non-anomalous) data. The algorithm will learn what 'normal' looks like and detect deviations.")
 
 # Data splitting configuration
-st.header("3. Data Splitting")
+st.header("4. Data Splitting")
 
 col1, col2 = st.columns(2)
 
@@ -150,7 +198,7 @@ model_name = st.text_input(
 )
 
 # Training section
-st.header("4. Training")
+st.header("5. Training")
 
 if st.button("🚀 Start Training", type="primary"):
     if model_name in st.session_state.models:
@@ -160,30 +208,59 @@ if st.button("🚀 Start Training", type="primary"):
         X = data['X'].values
         y = data['y'].values
         
-        # Split data
-        try:
-            X_temp, X_test, y_temp, y_test = train_test_split(
-                X, y, test_size=test_size, random_state=42, stratify=y
+        # Initialize model based on type
+        if model_type == "Deep Neural Network (ANN)":
+            # Split data for ANN (needs train/val/test)
+            try:
+                X_temp, X_test, y_temp, y_test = train_test_split(
+                    X, y, test_size=test_size, random_state=42, stratify=y
+                )
+                
+                val_size_adjusted = val_size / (1 - test_size)
+                X_train, X_val, y_train, y_val = train_test_split(
+                    X_temp, y_temp, test_size=val_size_adjusted, 
+                    random_state=42, stratify=y_temp
+                )
+                
+                st.success(f"✅ Data split: Train={len(X_train)}, Val={len(X_val)}, Test={len(X_test)}")
+                
+            except Exception as e:
+                st.error(f"Error splitting data: {str(e)}")
+                st.stop()
+            
+            # Initialize ANN model
+            model = AnomalyDetectionModel(
+                num_input_units=num_input_units,
+                num_hidden_layers=num_hidden_layers,
+                num_units_per_hidden_layer=num_units_per_layer
             )
-            
-            val_size_adjusted = val_size / (1 - test_size)
-            X_train, X_val, y_train, y_val = train_test_split(
-                X_temp, y_temp, test_size=val_size_adjusted, 
-                random_state=42, stratify=y_temp
-            )
-            
-            st.success(f"✅ Data split: Train={len(X_train)}, Val={len(X_val)}, Test={len(X_test)}")
-            
-        except Exception as e:
-            st.error(f"Error splitting data: {str(e)}")
-            st.stop()
         
-        # Initialize model
-        model = AnomalyDetectionModel(
-            num_input_units=num_input_units,
-            num_hidden_layers=num_hidden_layers,
-            num_units_per_hidden_layer=num_units_per_layer
-        )
+        else:  # OCSVM
+            # For OCSVM, use only normal data for training
+            normal_indices = y == 0
+            X_normal = X[normal_indices]
+            
+            # Split normal data for training and some for testing
+            X_train_normal, X_test_normal = train_test_split(
+                X_normal, test_size=0.2, random_state=42
+            )
+            
+            # Create test set with both normal and anomaly data
+            X_test = X[~normal_indices][:len(X_test_normal)]  # Same number of anomalies as normal test
+            y_test_anomaly = y[~normal_indices][:len(X_test_normal)]
+            
+            # Combine for balanced test set
+            X_test = np.vstack([X_test_normal, X_test])
+            y_test = np.hstack([np.zeros(len(X_test_normal)), y_test_anomaly])
+            
+            st.success(f"✅ OCSVM Data prepared: Train={len(X_train_normal)} normal samples, Test={len(X_test)} samples")
+            
+            # Initialize OCSVM model
+            model = OCSDVMDetector(
+                kernel=kernel,
+                gamma=gamma,
+                nu=nu
+            )
         
         # Training progress containers
         progress_bar = st.progress(0)
