@@ -343,12 +343,20 @@ if st.button("🚀 Start Training", type="primary"):
                 st.metric("Accuracy", f"{test_results['accuracy']:.3f}")
             with col2:
                 # Handle different key formats for classification report
-                anomaly_key = '1' if '1' in test_results['classification_report'] else 1
-                st.metric("Precision", f"{test_results['classification_report'][anomaly_key]['precision']:.3f}")
+                report = test_results['classification_report']
+                if '1' in report:
+                    anomaly_metrics = report['1']
+                elif 1 in report:
+                    anomaly_metrics = report[1]
+                else:
+                    # Fallback - use macro avg or create safe defaults
+                    anomaly_metrics = report.get('macro avg', {'precision': 0, 'recall': 0, 'f1-score': 0})
+                
+                st.metric("Precision", f"{anomaly_metrics.get('precision', 0):.3f}")
             with col3:
-                st.metric("Recall", f"{test_results['classification_report'][anomaly_key]['recall']:.3f}")
+                st.metric("Recall", f"{anomaly_metrics.get('recall', 0):.3f}")
             with col4:
-                st.metric("F1-Score", f"{test_results['classification_report'][anomaly_key]['f1-score']:.3f}")
+                st.metric("F1-Score", f"{anomaly_metrics.get('f1-score', 0):.3f}")
             
             # Visualizations
             col1, col2 = st.columns(2)
