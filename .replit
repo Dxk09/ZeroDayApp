@@ -18,28 +18,15 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Anomaly Detection Server"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Zero-Day Detector"
+args = "Zero-Day ANN Detection"
 
 [[workflows.workflow]]
-name = "Anomaly Detection Server"
+name = "Zero-Day ANN Detection"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run app.py --server.port 8080"
-waitForPort = 8080
-
-[[workflows.workflow]]
-name = "Zero-Day Detector"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0"
+args = "streamlit run zero_day_app.py --server.port 5000 --server.address 0.0.0.0"
 waitForPort = 5000
 
 [[ports]]

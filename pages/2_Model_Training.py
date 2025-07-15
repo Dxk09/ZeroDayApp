@@ -589,7 +589,10 @@ with st.sidebar:
                 if 'test_results' in model_info:
                     results = model_info['test_results']
                     st.write(f"**Accuracy:** {results['accuracy']:.3f}")
-                    st.write(f"**F1-Score:** {results['classification_report']['1']['f1-score']:.3f}")
+                    if 'classification_report' in results and '1' in results['classification_report']:
+                        st.write(f"**F1-Score:** {results['classification_report']['1']['f1-score']:.3f}")
+                    else:
+                        st.write(f"**F1-Score:** Not available")
                 
                 if st.button(f"🗑️ Delete", key=f"delete_{name}"):
                     # Remove model file
