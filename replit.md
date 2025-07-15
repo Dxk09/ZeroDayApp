@@ -4,27 +4,28 @@
 A streamlined Streamlit application focused on training One-Class Support Vector Machines (OCSVM) on normal traffic from KDDTrain+ dataset and testing them against authentic zero-day attacks from KDDTest+. The system follows a specific workflow: train on normal traffic patterns, then evaluate detection performance on previously unseen attack types.
 
 ## Recent Changes
-- **2025-07-15**: Replaced ANN with OCSVM for more effective zero-day detection
-- **2025-07-15**: Implemented One-Class SVM focusing on normal traffic patterns
-- **2025-07-15**: Added hyperparameter optimization with grid search
-- **2025-07-15**: Created binary prediction interface for anomaly detection
-- **2025-07-15**: Added support for RBF, linear, poly, and sigmoid kernels
-- **2025-07-15**: Implemented proper anomaly scoring for zero-day threats
-- **2025-07-15**: Streamlined training to focus on normal traffic only
+- **2025-07-15**: Created multi-page application with separate ANN and OCSVM implementations
+- **2025-07-15**: Fixed numpy format string error by converting values to native Python types
+- **2025-07-15**: Implemented comprehensive ANN page with full supervised learning workflow
+- **2025-07-15**: Added OCSVM page with one-class anomaly detection approach
+- **2025-07-15**: Both approaches now train and test against zero-day attacks independently
+- **2025-07-15**: Added hyperparameter optimization for OCSVM with grid search
+- **2025-07-15**: Created binary prediction interface for consistent anomaly detection
+- **2025-07-15**: Added support for RBF, linear, poly, and sigmoid kernels in OCSVM
 
 ## Project Architecture
 
 ### Core Components
 1. **Main Application** (`zero_day_app.py`)
-   - Streamlined 3-tab interface
-   - Tab 1: Train ANN on KDDTrain+ (known attacks)
-   - Tab 2: Test against KDDTest+ zero-day attacks
-   - Tab 3: Analyze detection performance
+   - Multi-page interface with ANN and OCSVM approaches
+   - Page 1: ANN - Train on known attacks, test against zero-day
+   - Page 2: OCSVM - Train on normal traffic, test against zero-day
+   - Each page has 3 tabs: Train, Test, Analyze
 
-2. **Model Implementation** (`models/ocsvm_detector.py`)
-   - OCSVM-based anomaly detection
-   - Scikit-learn implementation with multiple kernels
-   - Hyperparameter optimization and evaluation
+2. **Model Implementations**
+   - `models/anomaly_detector.py`: ANN-based supervised learning
+   - `models/ocsvm_detector.py`: OCSVM-based anomaly detection
+   - Both support comprehensive evaluation and hyperparameter tuning
 
 3. **Utilities**
    - `utils/kdd_zero_day_filter.py`: KDD dataset filtering for proper separation
@@ -35,13 +36,15 @@ A streamlined Streamlit application focused on training One-Class Support Vector
    - `attached_assets/KDDTest+ copy.txt`: Test data with zero-day attacks
 
 ### Key Features
+- **Dual Approach Comparison**: Side-by-side ANN vs OCSVM implementations
 - **Proper Data Separation**: KDDTrain+ for training, KDDTest+ zero-day attacks for testing
 - **Authentic Zero-Day Evaluation**: Tests only on attack types not seen during training
-- **Known Attack Training**: Trains on back, neptune, satan, smurf, teardrop, warezclient, etc.
+- **ANN Training**: Supervised learning on known attacks (back, neptune, satan, smurf, etc.)
+- **OCSVM Training**: Unsupervised learning on normal traffic patterns only
 - **Zero-Day Attack Testing**: Tests on apache2, mailbomb, processtable, snmpgetattack, etc.
 - **Professional Dataset**: 125,974+ KDDTrain+ records, 22,544+ KDDTest+ records
 - **Comprehensive Analysis**: Detailed performance metrics and attack-specific results
-- **Clean Workflow**: Simple 3-step process focused on zero-day detection
+- **Clean Workflow**: Simple 3-step process for each approach
 
 ## Development Notes
 
@@ -59,8 +62,14 @@ This warning is normal and harmless - the application functions correctly despit
 - Automatic preprocessing converts categorical features to numeric
 
 ### Zero-Day Detection Workflow
+**ANN Approach:**
+1. **Train Phase**: Load KDDTrain+ → Train on known attacks → Supervised learning
+2. **Test Phase**: Load KDDTest+ → Filter zero-day attacks → Test generalization
+3. **Analyze Phase**: Evaluate performance → Review attack-specific results
+
+**OCSVM Approach:**
 1. **Train Phase**: Load KDDTrain+ → Filter normal traffic → Train OCSVM
-2. **Test Phase**: Load KDDTest+ → Filter zero-day attacks → Test detection
+2. **Test Phase**: Load KDDTest+ → Filter zero-day attacks → Test anomaly detection
 3. **Analyze Phase**: Evaluate performance → Review attack-specific results
 
 ## User Preferences
