@@ -4,12 +4,13 @@
 A streamlined Streamlit application focused on training Artificial Neural Networks (ANN) on KDDTrain+ dataset and testing them against authentic zero-day attacks from KDDTest+. The system follows a specific workflow: train on known attacks, then evaluate detection performance on previously unseen attack types.
 
 ## Recent Changes
+- **2025-07-15**: Enhanced ANN architecture for better zero-day detection performance
+- **2025-07-15**: Improved model with 6 hidden layers, 128 units, batch normalization, and class balancing
+- **2025-07-15**: Added BCEWithLogitsLoss with pos_weight for imbalanced attack detection
+- **2025-07-15**: Implemented AdamW optimizer with learning rate scheduling
 - **2025-07-15**: Created streamlined zero-day detection app with proper data separation
-- **2025-07-15**: Implemented KDD dataset filtering for known vs zero-day attacks
-- **2025-07-15**: Added authentic zero-day evaluation using KDDTest+ filtered data
 - **2025-07-15**: Fixed data format issues for proper ANN training
 - **2025-07-15**: Removed unnecessary components to focus purely on zero-day detection
-- **2025-07-15**: Simplified workflow: Train → Test → Analyze zero-day performance
 
 ## Project Architecture
 

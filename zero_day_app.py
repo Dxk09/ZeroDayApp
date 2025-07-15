@@ -143,12 +143,12 @@ with tab1:
         
         with col1:
             st.write("**Model Architecture:**")
-            num_hidden_layers = st.slider("Hidden Layers", 2, 8, 4)
-            num_units_per_layer = st.slider("Units per Layer", 32, 256, 128)
+            num_hidden_layers = st.slider("Hidden Layers", 3, 8, 6)
+            num_units_per_layer = st.slider("Units per Layer", 64, 256, 128)
             
             st.write("**Training Parameters:**")
-            num_epochs = st.slider("Epochs", 50, 500, 200)
-            batch_size = st.slider("Batch Size", 32, 512, 128)
+            num_epochs = st.slider("Epochs", 100, 1000, 300)
+            batch_size = st.slider("Batch Size", 32, 512, 64)
             learning_rate = st.slider("Learning Rate", 0.0001, 0.01, 0.001, format="%.4f")
         
         with col2:

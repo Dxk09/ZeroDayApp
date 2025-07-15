@@ -27,25 +27,29 @@ class CyberSecurityDataset(Dataset):
 class AnomalyDetector(nn.Module):
     """Deep Neural Network for Anomaly Detection"""
     
-    def __init__(self, num_input_units, num_hidden_layers=4, num_units_per_hidden_layer=4):
+    def __init__(self, num_input_units, num_hidden_layers=6, num_units_per_hidden_layer=128):
         super(AnomalyDetector, self).__init__()
         
         layers = []
         
-        # Input layer
+        # Input layer - larger initial layer for better feature extraction
         layers.append(nn.Linear(num_input_units, num_units_per_hidden_layer))
         layers.append(nn.ReLU())
-        layers.append(nn.Dropout(0.2))
+        layers.append(nn.BatchNorm1d(num_units_per_hidden_layer))
+        layers.append(nn.Dropout(0.3))
         
-        # Hidden layers
-        for _ in range(num_hidden_layers):
-            layers.append(nn.Linear(num_units_per_hidden_layer, num_units_per_hidden_layer))
+        # Hidden layers with gradually decreasing size
+        current_size = num_units_per_hidden_layer
+        for i in range(num_hidden_layers):
+            next_size = max(32, current_size // 2) if i > 2 else current_size
+            layers.append(nn.Linear(current_size, next_size))
             layers.append(nn.ReLU())
-            layers.append(nn.Dropout(0.2))
+            layers.append(nn.BatchNorm1d(next_size))
+            layers.append(nn.Dropout(0.3))
+            current_size = next_size
         
-        # Output layer (binary classification)
-        layers.append(nn.Linear(num_units_per_hidden_layer, 1))
-        layers.append(nn.Sigmoid())  # Sigmoid for binary classification
+        # Output layer (binary classification) - remove sigmoid for BCEWithLogitsLoss
+        layers.append(nn.Linear(current_size, 1))
         
         self.network = nn.Sequential(*layers)
         
@@ -55,7 +59,7 @@ class AnomalyDetector(nn.Module):
 class AnomalyDetectionModel:
     """Complete anomaly detection model with training and prediction capabilities"""
     
-    def __init__(self, num_input_units, num_hidden_layers=4, num_units_per_hidden_layer=4):
+    def __init__(self, num_input_units, num_hidden_layers=6, num_units_per_hidden_layer=128):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = AnomalyDetector(num_input_units, num_hidden_layers, num_units_per_hidden_layer)
         self.model.to(self.device)
@@ -94,9 +98,16 @@ class AnomalyDetectionModel:
             val_dataset = CyberSecurityDataset(X_val_scaled, y_val)
             val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
         
-        # Define loss and optimizer
-        criterion = nn.BCELoss()
-        optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
+        # Calculate class weights for balanced training
+        unique, counts = np.unique(y_train, return_counts=True)
+        class_weights = torch.tensor([1.0 / counts[i] for i in range(len(unique))], dtype=torch.float32)
+        class_weights = class_weights / class_weights.sum()  # Normalize
+        
+        # Define loss and optimizer with class weighting
+        pos_weight = torch.tensor([class_weights[1] / class_weights[0]], dtype=torch.float32).to(self.device)
+        criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        optimizer = optim.AdamW(self.model.parameters(), lr=learning_rate, weight_decay=0.01)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10)
         
         best_val_loss = float('inf')
         patience_counter = 0
@@ -126,7 +137,7 @@ class AnomalyDetectionModel:
                 optimizer.step()
                 
                 train_loss += loss.item()
-                predicted = (outputs > 0.5).float()
+                predicted = (torch.sigmoid(outputs) > 0.5).float()
                 train_total += labels.size(0)
                 train_correct += (predicted == labels).sum().item()
             
@@ -149,7 +160,7 @@ class AnomalyDetectionModel:
                         loss = criterion(outputs, labels)
                         val_loss += loss.item()
                         
-                        predicted = (outputs > 0.5).float()
+                        predicted = (torch.sigmoid(outputs) > 0.5).float()
                         val_total += labels.size(0)
                         val_correct += (predicted == labels).sum().item()
                 
@@ -174,6 +185,10 @@ class AnomalyDetectionModel:
             self.training_history['train_accuracy'].append(train_accuracy)
             self.training_history['val_accuracy'].append(val_accuracy)
             self.training_history['epochs'].append(epoch + 1)
+            
+            # Learning rate scheduling
+            if X_val is not None:
+                scheduler.step(avg_val_loss)
             
             # Progress callback
             if progress_callback:
@@ -203,8 +218,8 @@ class AnomalyDetectionModel:
                 features = features.to(self.device)
                 outputs = self.model(features).squeeze()
                 
-                probs = outputs.cpu().numpy()
-                preds = (outputs > 0.5).float().cpu().numpy()
+                probs = torch.sigmoid(outputs).cpu().numpy()
+                preds = (torch.sigmoid(outputs) > 0.5).float().cpu().numpy()
                 
                 probabilities.extend(probs)
                 predictions.extend(preds)
