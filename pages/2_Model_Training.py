@@ -17,8 +17,8 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🧠 Model Training")
-st.markdown("Train deep neural network models for zero-day anomaly detection.")
+st.title("🧠 Zero-Day Model Training")
+st.markdown("Train specialized models for detecting previously unknown cybersecurity threats and zero-day attacks.")
 
 # Initialize session state
 if 'datasets' not in st.session_state:
@@ -35,7 +35,7 @@ processed_datasets = {
 
 if not processed_datasets:
     st.warning("No processed datasets available. Please upload and process a dataset first.")
-    st.info("👈 Go to **Data Upload** page to upload and preprocess your data.")
+    st.info("👈 Go to **Data Upload** page to load the built-in KDD Cup dataset for zero-day detection training.")
     st.stop()
 
 # Dataset selection

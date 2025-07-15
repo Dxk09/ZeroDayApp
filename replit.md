@@ -4,11 +4,13 @@
 A comprehensive Streamlit-based cybersecurity anomaly detection system that uses machine learning to identify zero-day threats in network traffic. The system provides both Deep Neural Network (ANN) and One-Class Support Vector Machine (OCSVM) approaches for anomaly detection, with built-in model comparison capabilities.
 
 ## Recent Changes
-- **2025-07-15**: Integrated built-in KDD Cup 1999 dataset for immediate training without file uploads
-- **2025-07-15**: Added automatic data preprocessing for KDD dataset (categorical encoding, binary labels)
-- **2025-07-15**: Implemented model comparison feature allowing users to compare ANN vs OCSVM accuracy
-- **2025-07-15**: Fixed session state initialization issues across all pages
-- **2025-07-15**: Added user-controlled accuracy comparison toggle in model training
+- **2025-07-15**: Enhanced system for authentic zero-day attack detection and analysis
+- **2025-07-15**: Added sophisticated Zero-Day Attack Simulator with realistic attack patterns
+- **2025-07-15**: Implemented Advanced Persistent Threat (APT) simulation capabilities
+- **2025-07-15**: Created comprehensive Zero-Day Testing Suite with evasion analysis
+- **2025-07-15**: Added Threat Intelligence Engine for attack pattern analysis
+- **2025-07-15**: Integrated polymorphic malware and AI-powered attack simulations
+- **2025-07-15**: Enhanced model training focus on zero-day threat detection
 
 ## Project Architecture
 
@@ -35,11 +37,13 @@ A comprehensive Streamlit-based cybersecurity anomaly detection system that uses
    - `utils/visualization.py`: Visualization components
 
 ### Key Features
-- **Dual Algorithm Support**: Both ANN and OCSVM for different use cases
-- **Built-in Dataset**: KDD Cup 1999 with 125,974+ network records
-- **Model Comparison**: Side-by-side accuracy analysis
-- **Real-time Training**: Progress bars and metric updates
-- **Professional Data**: Authentic cybersecurity attack types
+- **Zero-Day Attack Simulation**: Realistic APT, polymorphic malware, AI-powered, and supply chain attacks
+- **Advanced Evasion Testing**: Sophisticated techniques to test model robustness
+- **Threat Intelligence Engine**: Comprehensive attack pattern analysis and recommendations
+- **Dual Algorithm Support**: Both ANN and OCSVM for different zero-day detection approaches
+- **Built-in KDD Dataset**: 125,974+ authentic network records with real attack patterns
+- **Model Comparison**: Side-by-side accuracy analysis for zero-day detection performance
+- **Professional Security Data**: Authentic cybersecurity attack types for realistic testing
 
 ## Development Notes
 

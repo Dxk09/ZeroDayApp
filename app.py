@@ -34,6 +34,7 @@ os.makedirs('logs', exist_ok=True)
 
 # Main page
 st.title("🛡️ Zero-Day Anomaly Detection System")
+st.markdown("*Advanced cybersecurity defense against unknown threats and sophisticated attack patterns*")
 st.markdown("---")
 
 # System overview
@@ -75,26 +76,26 @@ st.header("🚀 Quick Start Guide")
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("1. Data Upload & Preprocessing")
-    st.write("📊 Upload your cybersecurity datasets (CSV, Excel, JSON)")
-    st.write("🔧 Preprocess data with feature scaling and normalization")
-    st.write("📋 View dataset statistics and quality metrics")
+    st.subheader("1. Data & Zero-Day Datasets")
+    st.write("🎯 Built-in KDD Cup dataset with authentic attack patterns")
+    st.write("🔧 Automatic preprocessing for immediate model training")
+    st.write("📋 Professional cybersecurity data ready for zero-day detection")
     
-    st.subheader("3. Real-Time Detection")
-    st.write("🔍 Upload new data for anomaly detection")
-    st.write("⚡ Get real-time anomaly scores and classifications")
-    st.write("🚨 Receive alerts for detected anomalies")
+    st.subheader("3. Zero-Day Testing")
+    st.write("🎭 Generate sophisticated attack patterns unseen in training")
+    st.write("⚡ Test model robustness against evasion techniques")
+    st.write("🚨 Validate detection of advanced persistent threats")
 
 with col2:
-    st.subheader("2. Model Training")
-    st.write("🧠 Train ANN models for binary classification")
-    st.write("📈 Monitor training progress and validation metrics")
-    st.write("💾 Save and manage multiple model versions")
+    st.subheader("2. Specialized Model Training")
+    st.write("🧠 Train ANN and OCSVM models for unknown threat detection")
+    st.write("📈 Monitor zero-day detection capabilities")
+    st.write("💾 Compare model performance on authentic attack data")
     
-    st.subheader("4. Dashboard & Analytics")
-    st.write("📊 View comprehensive performance metrics")
-    st.write("📈 Analyze detection trends and patterns")
-    st.write("🔧 Manage and compare model performance")
+    st.subheader("4. Threat Intelligence")
+    st.write("📊 Analyze attack patterns and evasion techniques")
+    st.write("📈 Monitor detection performance against new threats")
+    st.write("🔧 Continuous model improvement recommendations")
 
 st.markdown("---")
 
