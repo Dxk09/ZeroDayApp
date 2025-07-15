@@ -1,49 +1,46 @@
-# Zero-Day Anomaly Detection System
+# Zero-Day ANN Detection System
 
 ## Project Overview
-A comprehensive Streamlit-based cybersecurity anomaly detection system that uses machine learning to identify zero-day threats in network traffic. The system provides both Deep Neural Network (ANN) and One-Class Support Vector Machine (OCSVM) approaches for anomaly detection, with built-in model comparison capabilities.
+A streamlined Streamlit application focused on training Artificial Neural Networks (ANN) on KDDTrain+ dataset and testing them against authentic zero-day attacks from KDDTest+. The system follows a specific workflow: train on known attacks, then evaluate detection performance on previously unseen attack types.
 
 ## Recent Changes
-- **2025-07-15**: Enhanced system for authentic zero-day attack detection and analysis
-- **2025-07-15**: Added sophisticated Zero-Day Attack Simulator with realistic attack patterns
-- **2025-07-15**: Implemented Advanced Persistent Threat (APT) simulation capabilities
-- **2025-07-15**: Created comprehensive Zero-Day Testing Suite with evasion analysis
-- **2025-07-15**: Added Threat Intelligence Engine for attack pattern analysis
-- **2025-07-15**: Integrated polymorphic malware and AI-powered attack simulations
-- **2025-07-15**: Enhanced model training focus on zero-day threat detection
+- **2025-07-15**: Created streamlined zero-day detection app with proper data separation
+- **2025-07-15**: Implemented KDD dataset filtering for known vs zero-day attacks
+- **2025-07-15**: Added authentic zero-day evaluation using KDDTest+ filtered data
+- **2025-07-15**: Fixed data format issues for proper ANN training
+- **2025-07-15**: Removed unnecessary components to focus purely on zero-day detection
+- **2025-07-15**: Simplified workflow: Train → Test → Analyze zero-day performance
 
 ## Project Architecture
 
 ### Core Components
-1. **Data Upload & Preprocessing** (`pages/1_Data_Upload.py`)
-   - Built-in KDD Cup 1999 dataset integration
-   - Automatic categorical feature encoding
-   - Binary label creation (normal=0, anomaly=1)
-   - Custom file upload support for additional datasets
+1. **Main Application** (`zero_day_app.py`)
+   - Streamlined 3-tab interface
+   - Tab 1: Train ANN on KDDTrain+ (known attacks)
+   - Tab 2: Test against KDDTest+ zero-day attacks
+   - Tab 3: Analyze detection performance
 
-2. **Model Training** (`pages/2_Model_Training.py`)
-   - Deep Neural Network (ANN) implementation
-   - One-Class Support Vector Machine (OCSVM) implementation
-   - Model comparison and accuracy analysis
-   - Training progress visualization
+2. **Model Implementation** (`models/anomaly_detector.py`)
+   - ANN-based anomaly detection
+   - PyTorch implementation with customizable architecture
+   - Training progress tracking and evaluation
 
-3. **Model Classes**
-   - `models/anomaly_detector.py`: ANN-based anomaly detection
-   - `models/ocsvm_detector.py`: OCSVM-based anomaly detection
-
-4. **Utilities**
-   - `utils/data_preprocessing.py`: Data processing utilities
+3. **Utilities**
+   - `utils/kdd_zero_day_filter.py`: KDD dataset filtering for proper separation
    - `utils/model_evaluation.py`: Model evaluation and metrics
-   - `utils/visualization.py`: Visualization components
+
+4. **Data**
+   - `attached_assets/KDDTrain+ copy.txt`: Training data with known attacks
+   - `attached_assets/KDDTest+ copy.txt`: Test data with zero-day attacks
 
 ### Key Features
-- **Zero-Day Attack Simulation**: Realistic APT, polymorphic malware, AI-powered, and supply chain attacks
-- **Advanced Evasion Testing**: Sophisticated techniques to test model robustness
-- **Threat Intelligence Engine**: Comprehensive attack pattern analysis and recommendations
-- **Dual Algorithm Support**: Both ANN and OCSVM for different zero-day detection approaches
-- **Built-in KDD Dataset**: 125,974+ authentic network records with real attack patterns
-- **Model Comparison**: Side-by-side accuracy analysis for zero-day detection performance
-- **Professional Security Data**: Authentic cybersecurity attack types for realistic testing
+- **Proper Data Separation**: KDDTrain+ for training, KDDTest+ zero-day attacks for testing
+- **Authentic Zero-Day Evaluation**: Tests only on attack types not seen during training
+- **Known Attack Training**: Trains on back, neptune, satan, smurf, teardrop, warezclient, etc.
+- **Zero-Day Attack Testing**: Tests on apache2, mailbomb, processtable, snmpgetattack, etc.
+- **Professional Dataset**: 125,974+ KDDTrain+ records, 22,544+ KDDTest+ records
+- **Comprehensive Analysis**: Detailed performance metrics and attack-specific results
+- **Clean Workflow**: Simple 3-step process focused on zero-day detection
 
 ## Development Notes
 
@@ -60,20 +57,21 @@ This warning is normal and harmless - the application functions correctly despit
 - Binary classification: normal vs anomaly detection
 - Automatic preprocessing converts categorical features to numeric
 
-### Model Training Flow
-1. Load KDD dataset → Automatic preprocessing → Ready for training
-2. Choose ANN or OCSVM → Configure parameters → Train model
-3. Evaluate performance → Compare models → Select best approach
+### Zero-Day Detection Workflow
+1. **Train Phase**: Load KDDTrain+ → Filter known attacks → Train ANN
+2. **Test Phase**: Load KDDTest+ → Filter zero-day attacks → Test detection
+3. **Analyze Phase**: Evaluate performance → Review attack-specific results
 
 ## User Preferences
-- Focus on authentic cybersecurity data (KDD Cup 1999)
-- Provide both deep learning and classical ML options
-- Enable model comparison for decision-making
-- Streamlined workflow with minimal manual steps
+- Focus purely on zero-day detection capabilities
+- Use authentic KDD Cup 1999 data with proper separation
+- Streamlined single-purpose application
+- Clear evaluation of detection performance on unseen attacks
 
 ## Technical Specifications
 - **Framework**: Streamlit for web interface
-- **ML Libraries**: PyTorch (ANN), Scikit-learn (OCSVM)
+- **ML Library**: PyTorch for ANN implementation
 - **Data Processing**: Pandas, NumPy, Scikit-learn preprocessing
 - **Visualization**: Plotly for interactive charts
-- **Dataset**: KDD Cup 1999 Network Intrusion Detection
+- **Dataset**: KDD Cup 1999 with proper known/zero-day separation
+- **Evaluation**: Custom zero-day specific metrics and analysis
