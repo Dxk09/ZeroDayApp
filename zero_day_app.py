@@ -29,8 +29,10 @@ if 'ocsvm_model' not in st.session_state:
     st.session_state.ocsvm_model = None
 if 'ann_model' not in st.session_state:
     st.session_state.ann_model = None
-if 'training_data' not in st.session_state:
-    st.session_state.training_data = None
+if 'ann_training_data' not in st.session_state:
+    st.session_state.ann_training_data = None
+if 'ocsvm_training_data' not in st.session_state:
+    st.session_state.ocsvm_training_data = None
 if 'zero_day_data' not in st.session_state:
     st.session_state.zero_day_data = None
 if 'ocsvm_training_complete' not in st.session_state:
@@ -87,10 +89,11 @@ if page == "🧠 ANN (Artificial Neural Network)":
                                 'diff_srv_rate', 'srv_diff_host_rate', 'dst_host_count', 'dst_host_srv_count',
                                 'dst_host_same_srv_rate', 'dst_host_diff_srv_rate', 'dst_host_same_src_port_rate',
                                 'dst_host_srv_diff_host_rate', 'dst_host_serror_rate', 'dst_host_srv_serror_rate',
-                                'dst_host_rerror_rate', 'dst_host_srv_rerror_rate', 'attack_type'
+                                'dst_host_rerror_rate', 'dst_host_srv_rerror_rate', 'attack_type', 'difficulty'
                             ]
                             
                             kdd_train = pd.read_csv(train_file, names=column_names, low_memory=False)
+                            kdd_train = kdd_train.drop('difficulty', axis=1)  # Remove difficulty column
                             filtered_train = zero_day_filter.filter_training_data(kdd_train)
                             
                             # Preprocessing
@@ -107,7 +110,8 @@ if page == "🧠 ANN (Artificial Neural Network)":
                             # Create binary labels
                             y = (y_original != 'normal').astype(int)
                             
-                            st.session_state.training_data = {
+                            # Store training data with ANN prefix to avoid conflicts
+                            st.session_state.ann_training_data = {
                                 'X': X,
                                 'y': y,
                                 'original_labels': y_original,
@@ -117,6 +121,12 @@ if page == "🧠 ANN (Artificial Neural Network)":
                             st.success("✅ KDDTrain+ dataset loaded successfully!")
                             st.write(f"**Dataset Info:** {len(X):,} samples, {len(X.columns)} features")
                             st.write(f"**Attack Rate:** {np.mean(y):.2%}")
+                            
+                            # Debug info
+                            unique_attacks = y_original.unique()
+                            st.write(f"**Attack Types:** {len(unique_attacks)} types")
+                            st.write(f"**Normal Samples:** {np.sum(y == 0):,}")
+                            st.write(f"**Attack Samples:** {np.sum(y == 1):,}")
                             
                         else:
                             st.error("KDDTrain+ file not found. Please check the file path.")
@@ -128,7 +138,7 @@ if page == "🧠 ANN (Artificial Neural Network)":
             st.info("**ANN Training Focus:**\n- Learn patterns from known attacks\n- Normal + attack traffic\n- Supervised learning approach")
         
         # ANN training section
-        if st.session_state.training_data is not None:
+        if 'ann_training_data' in st.session_state and st.session_state.ann_training_data is not None:
             st.markdown("---")
             st.subheader("🧠 Configure and Train ANN")
             
@@ -150,16 +160,16 @@ if page == "🧠 ANN (Artificial Neural Network)":
                 val_split = st.slider("Validation Split", 0.1, 0.3, 0.2, key="ann_val_split")
                 
                 st.write("**Training Info:**")
-                st.write(f"Features: {len(st.session_state.training_data['X'].columns)}")
-                st.write(f"Samples: {len(st.session_state.training_data['X']):,}")
-                st.write(f"Attack Rate: {np.mean(st.session_state.training_data['y']):.2%}")
+                st.write(f"Features: {len(st.session_state.ann_training_data['X'].columns)}")
+                st.write(f"Samples: {len(st.session_state.ann_training_data['X']):,}")
+                st.write(f"Attack Rate: {np.mean(st.session_state.ann_training_data['y']):.2%}")
             
             if st.button("🎯 Train ANN Model", type="primary", key="ann_train"):
                 with st.spinner("Training ANN on known attacks..."):
                     try:
                         # Prepare data
-                        X = st.session_state.training_data['X']
-                        y = st.session_state.training_data['y']
+                        X = st.session_state.ann_training_data['X']
+                        y = st.session_state.ann_training_data['y']
                         
                         # Split data
                         from sklearn.model_selection import train_test_split
@@ -265,7 +275,7 @@ if page == "🧠 ANN (Artificial Neural Network)":
                             y_test_original = filtered_test['attack_type']
                             
                             # Apply same encoding as training
-                            label_encoders = st.session_state.training_data['label_encoders']
+                            label_encoders = st.session_state.ann_training_data['label_encoders']
                             for col in X_test.select_dtypes(include=['object']).columns:
                                 if col in label_encoders:
                                     le = label_encoders[col]
@@ -278,7 +288,7 @@ if page == "🧠 ANN (Artificial Neural Network)":
                             # Create binary labels
                             y_test_binary = (y_test_original != 'normal').astype(int)
                             
-                            # Make predictions
+                            # Make predictions using ANN
                             model = st.session_state.ann_model
                             X_test_array = X_test.values
                             predictions = model.predict(X_test_array)
@@ -402,7 +412,7 @@ elif page == "🎯 OCSVM (One-Class SVM)":
                             y_binary = (y != 'normal').astype(int)
                             
                             # Store training data
-                            st.session_state.training_data = {
+                            st.session_state.ocsvm_training_data = {
                                 'X': X,
                                 'y': y_binary,
                                 'original_labels': y,
@@ -425,7 +435,7 @@ elif page == "🎯 OCSVM (One-Class SVM)":
             st.info("**OCSVM Training Focus:**\n- Normal network traffic patterns\n- Learns baseline behavior\n- Detects deviations as anomalies")
         
         # Model training section
-        if st.session_state.training_data is not None:
+        if st.session_state.ocsvm_training_data is not None:
             st.markdown("---")
             st.subheader("🧠 Configure and Train OCSVM")
             
@@ -442,18 +452,18 @@ elif page == "🎯 OCSVM (One-Class SVM)":
                 optimize_params = st.checkbox("Optimize Hyperparameters", value=False, key="ocsvm_optimize")
                 
                 st.write("**Training Info:**")
-                st.write(f"Features: {len(st.session_state.training_data['X'].columns)}")
-                st.write(f"Total Samples: {len(st.session_state.training_data['X']):,}")
-                normal_samples = len(st.session_state.training_data['X']) - np.sum(st.session_state.training_data['y'])
+                st.write(f"Features: {len(st.session_state.ocsvm_training_data['X'].columns)}")
+                st.write(f"Total Samples: {len(st.session_state.ocsvm_training_data['X']):,}")
+                normal_samples = len(st.session_state.ocsvm_training_data['X']) - np.sum(st.session_state.ocsvm_training_data['y'])
                 st.write(f"Normal Samples: {normal_samples:,}")
-                st.write(f"Normal Rate: {(1 - np.mean(st.session_state.training_data['y'])):.2%}")
+                st.write(f"Normal Rate: {(1 - np.mean(st.session_state.ocsvm_training_data['y'])):.2%}")
             
             if st.button("🎯 Train OCSVM Model", type="primary", key="ocsvm_train"):
                 with st.spinner("Training OCSVM on normal traffic..."):
                     try:
                         # Prepare data
-                        X = st.session_state.training_data['X']
-                        y = st.session_state.training_data['y']
+                        X = st.session_state.ocsvm_training_data['X']
+                        y = st.session_state.ocsvm_training_data['y']
                         
                         # Convert to numpy arrays
                         X_array = X.values
@@ -553,7 +563,7 @@ elif page == "🎯 OCSVM (One-Class SVM)":
                             y_test_original = filtered_test['attack_type']
                             
                             # Apply same encoding as training
-                            label_encoders = st.session_state.training_data['label_encoders']
+                            label_encoders = st.session_state.ocsvm_training_data['label_encoders']
                             for col in X_test.select_dtypes(include=['object']).columns:
                                 if col in label_encoders:
                                     le = label_encoders[col]
