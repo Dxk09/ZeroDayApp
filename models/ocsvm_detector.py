@@ -65,16 +65,16 @@ class OCSVMDetector:
         
         # Store training statistics
         self.training_stats = {
-            'n_support_vectors': self.model.n_support_,
-            'support_vector_ratio': self.model.n_support_ / len(X_scaled),
-            'normal_samples_used': len(X_scaled),
-            'total_samples_available': len(X_train) if y_train is not None else len(X_train)
+            'n_support_vectors': int(self.model.n_support_),
+            'support_vector_ratio': float(self.model.n_support_ / len(X_scaled)),
+            'normal_samples_used': int(len(X_scaled)),
+            'total_samples_available': int(len(X_train) if y_train is not None else len(X_train))
         }
         
         self.is_fitted = True
         
         if progress_callback:
-            progress_callback(f"OCSVM trained with {self.model.n_support_} support vectors")
+            progress_callback(f"OCSVM trained with {int(self.model.n_support_)} support vectors")
             
         return self.training_stats
     
@@ -255,10 +255,10 @@ class OCSVMDetector:
             
             # Update training stats
             self.training_stats = {
-                'n_support_vectors': self.model.n_support_,
-                'support_vector_ratio': self.model.n_support_ / len(X_scaled),
-                'normal_samples_used': len(X_scaled),
-                'total_samples_available': len(X_train)
+                'n_support_vectors': int(self.model.n_support_),
+                'support_vector_ratio': float(self.model.n_support_ / len(X_scaled)),
+                'normal_samples_used': int(len(X_scaled)),
+                'total_samples_available': int(len(X_train))
             }
         else:
             # Fallback to default parameters
@@ -267,5 +267,13 @@ class OCSVMDetector:
             self.is_fitted = True
             best_params = {'kernel': 'rbf', 'nu': 0.1, 'gamma': 'scale'}
             best_score = 0.0
+            
+            # Update training stats for fallback case
+            self.training_stats = {
+                'n_support_vectors': int(self.model.n_support_),
+                'support_vector_ratio': float(self.model.n_support_ / len(X_scaled)),
+                'normal_samples_used': int(len(X_scaled)),
+                'total_samples_available': int(len(X_train))
+            }
         
         return best_params, best_score
