@@ -15,7 +15,7 @@ import os
 # Add utils to path
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 from utils.kdd_zero_day_filter import KDDZeroDayFilter
-from models.anomaly_detector import AnomalyDetectionModel
+from models.ocsvm_detector import OCSVMDetector
 
 # Configure page
 st.set_page_config(
@@ -41,21 +41,21 @@ if 'zero_day_results' not in st.session_state:
 zero_day_filter = KDDZeroDayFilter()
 
 # Title and description
-st.title("🎯 Zero-Day ANN Detection System")
-st.markdown("**Train ANN on KDDTrain+ → Test against Zero-Day Attacks from KDDTest+**")
+st.title("🎯 Zero-Day OCSVM Detection System")
+st.markdown("**Train OCSVM on Normal Traffic → Test against Zero-Day Attacks from KDDTest+**")
 st.markdown("---")
 
 # Main workflow
-tab1, tab2, tab3 = st.tabs(["📚 Train on KDDTrain+", "🎯 Test Zero-Day Detection", "📊 Results Analysis"])
+tab1, tab2, tab3 = st.tabs(["📚 Train on Normal Traffic", "🎯 Test Zero-Day Detection", "📊 Results Analysis"])
 
 with tab1:
-    st.header("📚 Step 1: Train ANN on KDDTrain+")
-    st.markdown("Train your neural network on known attack patterns from KDDTrain+")
+    st.header("📚 Step 1: Train OCSVM on Normal Traffic")
+    st.markdown("Train your One-Class SVM on normal traffic patterns from KDDTrain+")
     
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        if st.button("🚀 Load KDDTrain+ and Start Training", type="primary"):
+        if st.button("🚀 Load KDDTrain+ Normal Traffic", type="primary"):
             with st.spinner("Loading KDDTrain+ dataset..."):
                 try:
                     # Load KDDTrain+ data
@@ -132,143 +132,102 @@ with tab1:
                     st.error(f"Error loading data: {str(e)}")
     
     with col2:
-        st.info("**Training Data Sources:**\n- Normal network traffic\n- Known attack patterns\n- DoS, Probe, R2L, U2R categories")
+        st.info("**OCSVM Training Focus:**\n- Normal network traffic patterns\n- Learns baseline behavior\n- Detects deviations as anomalies")
     
     # Model training section
     if st.session_state.training_data is not None:
         st.markdown("---")
-        st.subheader("🧠 Configure and Train ANN")
+        st.subheader("🧠 Configure and Train OCSVM")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.write("**Model Architecture:**")
-            num_hidden_layers = st.slider("Hidden Layers", 3, 8, 6)
-            num_units_per_layer = st.slider("Units per Layer", 64, 256, 128)
+            st.write("**OCSVM Parameters:**")
+            kernel = st.selectbox("Kernel", ['rbf', 'linear', 'poly', 'sigmoid'], index=0)
+            nu = st.slider("Nu (Outlier Fraction)", 0.01, 0.5, 0.1, step=0.01)
+            gamma = st.selectbox("Gamma", ['scale', 'auto', 0.001, 0.01, 0.1, 1.0], index=0)
             
-            st.write("**Training Parameters:**")
-            num_epochs = st.slider("Epochs", 100, 1000, 300)
-            batch_size = st.slider("Batch Size", 32, 512, 64)
-            learning_rate = st.slider("Learning Rate", 0.0001, 0.01, 0.001, format="%.4f")
-        
         with col2:
-            st.write("**Data Configuration:**")
-            train_split = st.slider("Training Split", 0.6, 0.9, 0.8)
-            val_split = st.slider("Validation Split", 0.1, 0.3, 0.2)
+            st.write("**Training Configuration:**")
+            optimize_params = st.checkbox("Optimize Hyperparameters", value=False)
             
             st.write("**Training Info:**")
             st.write(f"Features: {len(st.session_state.training_data['X'].columns)}")
-            st.write(f"Samples: {len(st.session_state.training_data['X']):,}")
-            st.write(f"Attack Rate: {np.mean(st.session_state.training_data['y']):.2%}")
+            st.write(f"Total Samples: {len(st.session_state.training_data['X']):,}")
+            normal_samples = len(st.session_state.training_data['X']) - np.sum(st.session_state.training_data['y'])
+            st.write(f"Normal Samples: {normal_samples:,}")
+            st.write(f"Normal Rate: {(1 - np.mean(st.session_state.training_data['y'])):.2%}")
         
-        if st.button("🎯 Train ANN Model", type="primary"):
-            with st.spinner("Training ANN on known attacks..."):
+        if st.button("🎯 Train OCSVM Model", type="primary"):
+            with st.spinner("Training OCSVM on normal traffic..."):
                 try:
                     # Prepare data
                     X = st.session_state.training_data['X']
                     y = st.session_state.training_data['y']
                     
-                    # Split data
-                    from sklearn.model_selection import train_test_split
-                    X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=1-train_split, random_state=42)
-                    X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
+                    # Convert to numpy arrays
+                    X_array = X.values
+                    y_array = y.values
                     
-                    # Ensure all data is in numpy array format
-                    X_train = X_train.values if hasattr(X_train, 'values') else X_train
-                    X_val = X_val.values if hasattr(X_val, 'values') else X_val
-                    X_test = X_test.values if hasattr(X_test, 'values') else X_test
-                    y_train = y_train.values if hasattr(y_train, 'values') else y_train
-                    y_val = y_val.values if hasattr(y_val, 'values') else y_val
-                    y_test = y_test.values if hasattr(y_test, 'values') else y_test
+                    # Create OCSVM model
+                    model = OCSVMDetector(kernel=kernel, nu=nu, gamma=gamma)
                     
-                    # Initialize model
-                    model = AnomalyDetectionModel(
-                        num_input_units=len(X.columns),
-                        num_hidden_layers=num_hidden_layers,
-                        num_units_per_hidden_layer=num_units_per_layer
-                    )
+                    # Progress tracking
+                    progress_text = st.empty()
                     
-                    # Training progress
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-                    metrics_placeholder = st.empty()
+                    def progress_callback(message):
+                        progress_text.text(message)
                     
-                    def progress_callback(epoch, total_epochs, train_loss, val_loss, train_acc, val_acc):
-                        progress = epoch / total_epochs
-                        progress_bar.progress(progress)
-                        status_text.text(f"Epoch {epoch}/{total_epochs}")
-                        
-                        with metrics_placeholder.container():
-                            col1, col2, col3, col4 = st.columns(4)
-                            with col1:
-                                st.metric("Train Loss", f"{train_loss:.4f}")
-                            with col2:
-                                st.metric("Val Loss", f"{val_loss:.4f}")
-                            with col3:
-                                st.metric("Train Acc", f"{train_acc:.3f}")
-                            with col4:
-                                st.metric("Val Acc", f"{val_acc:.3f}")
+                    # Train model (with or without hyperparameter optimization)
+                    if optimize_params:
+                        progress_callback("Optimizing hyperparameters...")
+                        best_params, best_score = model.optimize_hyperparameters(X_array, y_array)
+                        progress_callback(f"Best parameters found: {best_params}")
+                        training_stats = model.training_stats
+                    else:
+                        training_stats = model.train(X_array, y_array, progress_callback=progress_callback)
                     
-                    # Train model
-                    history = model.train(
-                        X_train, y_train, X_val, y_val,
-                        num_epochs=num_epochs,
-                        batch_size=batch_size,
-                        learning_rate=learning_rate,
-                        progress_callback=progress_callback
-                    )
-                    
-                    # Evaluate on test set
-                    test_results = model.evaluate(X_test, y_test)
-                    
-                    # Store trained model
+                    # Store model and mark training complete
                     st.session_state.model = model
                     st.session_state.training_complete = True
                     
-                    st.success("✅ ANN training completed!")
+                    progress_text.text("Training completed!")
                     
-                    # Show final results
+                    st.success("✅ OCSVM training completed successfully!")
+                    
+                    # Show training results
                     st.subheader("📊 Training Results")
-                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    col1, col2 = st.columns(2)
                     
                     with col1:
-                        st.metric("Final Accuracy", f"{test_results['accuracy']:.3f}")
+                        st.metric("Support Vectors", f"{training_stats['n_support_vectors']:,}")
+                        st.metric("Support Vector Ratio", f"{training_stats['support_vector_ratio']:.4f}")
+                    
                     with col2:
-                        st.metric("Precision", f"{test_results['precision']:.3f}")
-                    with col3:
-                        st.metric("Recall", f"{test_results['recall']:.3f}")
-                    with col4:
-                        st.metric("F1-Score", f"{test_results['f1_score']:.3f}")
+                        st.metric("Normal Samples Used", f"{training_stats['normal_samples_used']:,}")
+                        st.metric("Total Samples Available", f"{training_stats['total_samples_available']:,}")
                     
-                    # Training history plot
-                    fig = make_subplots(
-                        rows=1, cols=2,
-                        subplot_titles=["Loss", "Accuracy"],
-                        specs=[[{"secondary_y": False}, {"secondary_y": False}]]
-                    )
+                    # Show model parameters
+                    st.subheader("🔧 Model Configuration")
+                    param_col1, param_col2, param_col3 = st.columns(3)
                     
-                    epochs = list(range(1, len(history['train_loss']) + 1))
-                    
-                    # Loss plot
-                    fig.add_trace(go.Scatter(x=epochs, y=history['train_loss'], name="Train Loss", line=dict(color='blue')), row=1, col=1)
-                    fig.add_trace(go.Scatter(x=epochs, y=history['val_loss'], name="Val Loss", line=dict(color='red')), row=1, col=1)
-                    
-                    # Accuracy plot
-                    fig.add_trace(go.Scatter(x=epochs, y=history['train_acc'], name="Train Acc", line=dict(color='green')), row=1, col=2)
-                    fig.add_trace(go.Scatter(x=epochs, y=history['val_acc'], name="Val Acc", line=dict(color='orange')), row=1, col=2)
-                    
-                    fig.update_layout(title="Training Progress", height=400)
-                    st.plotly_chart(fig, use_container_width=True)
+                    with param_col1:
+                        st.write(f"**Kernel:** {model.kernel}")
+                    with param_col2:
+                        st.write(f"**Nu:** {model.nu}")
+                    with param_col3:
+                        st.write(f"**Gamma:** {model.gamma}")
                     
                 except Exception as e:
                     st.error(f"Training failed: {str(e)}")
 
 with tab2:
     st.header("🎯 Step 2: Test Against Zero-Day Attacks")
-    st.markdown("Test your trained ANN against previously unseen zero-day attacks from KDDTest+")
+    st.markdown("Test your trained OCSVM against previously unseen zero-day attacks from KDDTest+")
     
     if not st.session_state.training_complete:
-        st.warning("⚠️ Please train your ANN model first in the 'Train on KDDTrain+' tab")
+        st.warning("⚠️ Please train your OCSVM model first in the 'Train on Normal Traffic' tab")
         st.stop()
     
     col1, col2 = st.columns([2, 1])
@@ -370,7 +329,7 @@ with tab2:
             st.write(f"Zero-Day Types: {len(st.session_state.zero_day_data['analysis']['zero_day_only']['types'])}")
         
         if st.button("🚀 Run Zero-Day Detection Test", type="primary"):
-            with st.spinner("Testing ANN against zero-day attacks..."):
+            with st.spinner("Testing OCSVM against zero-day attacks..."):
                 try:
                     X_test = st.session_state.zero_day_data['X']
                     y_test = st.session_state.zero_day_data['y_binary']
@@ -387,10 +346,9 @@ with tab2:
                     X_test_array = X_test.values if hasattr(X_test, 'values') else X_test
                     y_test_array = y_test.values if hasattr(y_test, 'values') else y_test
                     
-                    # Make predictions
+                    # Make predictions using OCSVM
                     model = st.session_state.model
-                    predictions = model.predict(X_test_array)
-                    anomaly_scores = model.get_anomaly_score(X_test_array)
+                    predictions, anomaly_scores = model.predict_binary(X_test_array, return_probabilities=True)
                     
                     # Evaluate using zero-day specific metrics
                     evaluation_results = zero_day_filter.evaluate_zero_day_detection(
@@ -428,13 +386,13 @@ with tab2:
                     
                     # Quick performance summary
                     if zero_day_only_results['zero_day_detection_rate'] >= 0.9:
-                        st.success("🎉 Excellent! Your ANN detected 90%+ of zero-day attacks")
+                        st.success("🎉 Excellent! Your OCSVM detected 90%+ of zero-day attacks")
                     elif zero_day_only_results['zero_day_detection_rate'] >= 0.8:
-                        st.success("✅ Good! Your ANN detected 80%+ of zero-day attacks")
+                        st.success("✅ Good! Your OCSVM detected 80%+ of zero-day attacks")
                     elif zero_day_only_results['zero_day_detection_rate'] >= 0.7:
-                        st.warning("⚠️ Moderate. Your ANN detected 70%+ of zero-day attacks")
+                        st.warning("⚠️ Moderate. Your OCSVM detected 70%+ of zero-day attacks")
                     else:
-                        st.error("❌ Poor. Your ANN detected less than 70% of zero-day attacks")
+                        st.error("❌ Poor. Your OCSVM detected less than 70% of zero-day attacks")
                         
                 except Exception as e:
                     st.error(f"Testing failed: {str(e)}")

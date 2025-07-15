@@ -1,16 +1,16 @@
-# Zero-Day ANN Detection System
+# Zero-Day OCSVM Detection System
 
 ## Project Overview
-A streamlined Streamlit application focused on training Artificial Neural Networks (ANN) on KDDTrain+ dataset and testing them against authentic zero-day attacks from KDDTest+. The system follows a specific workflow: train on known attacks, then evaluate detection performance on previously unseen attack types.
+A streamlined Streamlit application focused on training One-Class Support Vector Machines (OCSVM) on normal traffic from KDDTrain+ dataset and testing them against authentic zero-day attacks from KDDTest+. The system follows a specific workflow: train on normal traffic patterns, then evaluate detection performance on previously unseen attack types.
 
 ## Recent Changes
-- **2025-07-15**: Enhanced ANN architecture for better zero-day detection performance
-- **2025-07-15**: Improved model with 6 hidden layers, 128 units, batch normalization, and class balancing
-- **2025-07-15**: Added BCEWithLogitsLoss with pos_weight for imbalanced attack detection
-- **2025-07-15**: Implemented AdamW optimizer with learning rate scheduling
-- **2025-07-15**: Created streamlined zero-day detection app with proper data separation
-- **2025-07-15**: Fixed data format issues for proper ANN training
-- **2025-07-15**: Removed unnecessary components to focus purely on zero-day detection
+- **2025-07-15**: Replaced ANN with OCSVM for more effective zero-day detection
+- **2025-07-15**: Implemented One-Class SVM focusing on normal traffic patterns
+- **2025-07-15**: Added hyperparameter optimization with grid search
+- **2025-07-15**: Created binary prediction interface for anomaly detection
+- **2025-07-15**: Added support for RBF, linear, poly, and sigmoid kernels
+- **2025-07-15**: Implemented proper anomaly scoring for zero-day threats
+- **2025-07-15**: Streamlined training to focus on normal traffic only
 
 ## Project Architecture
 
@@ -21,10 +21,10 @@ A streamlined Streamlit application focused on training Artificial Neural Networ
    - Tab 2: Test against KDDTest+ zero-day attacks
    - Tab 3: Analyze detection performance
 
-2. **Model Implementation** (`models/anomaly_detector.py`)
-   - ANN-based anomaly detection
-   - PyTorch implementation with customizable architecture
-   - Training progress tracking and evaluation
+2. **Model Implementation** (`models/ocsvm_detector.py`)
+   - OCSVM-based anomaly detection
+   - Scikit-learn implementation with multiple kernels
+   - Hyperparameter optimization and evaluation
 
 3. **Utilities**
    - `utils/kdd_zero_day_filter.py`: KDD dataset filtering for proper separation
@@ -59,7 +59,7 @@ This warning is normal and harmless - the application functions correctly despit
 - Automatic preprocessing converts categorical features to numeric
 
 ### Zero-Day Detection Workflow
-1. **Train Phase**: Load KDDTrain+ → Filter known attacks → Train ANN
+1. **Train Phase**: Load KDDTrain+ → Filter normal traffic → Train OCSVM
 2. **Test Phase**: Load KDDTest+ → Filter zero-day attacks → Test detection
 3. **Analyze Phase**: Evaluate performance → Review attack-specific results
 
@@ -71,8 +71,8 @@ This warning is normal and harmless - the application functions correctly despit
 
 ## Technical Specifications
 - **Framework**: Streamlit for web interface
-- **ML Library**: PyTorch for ANN implementation
+- **ML Library**: Scikit-learn for OCSVM implementation
 - **Data Processing**: Pandas, NumPy, Scikit-learn preprocessing
 - **Visualization**: Plotly for interactive charts
-- **Dataset**: KDD Cup 1999 with proper known/zero-day separation
+- **Dataset**: KDD Cup 1999 with proper normal/zero-day separation
 - **Evaluation**: Custom zero-day specific metrics and analysis
