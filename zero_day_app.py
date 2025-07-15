@@ -173,6 +173,14 @@ with tab1:
                     X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=1-train_split, random_state=42)
                     X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
                     
+                    # Ensure all data is in numpy array format
+                    X_train = X_train.values if hasattr(X_train, 'values') else X_train
+                    X_val = X_val.values if hasattr(X_val, 'values') else X_val
+                    X_test = X_test.values if hasattr(X_test, 'values') else X_test
+                    y_train = y_train.values if hasattr(y_train, 'values') else y_train
+                    y_val = y_val.values if hasattr(y_val, 'values') else y_val
+                    y_test = y_test.values if hasattr(y_test, 'values') else y_test
+                    
                     # Initialize model
                     model = AnomalyDetectionModel(
                         num_input_units=len(X.columns),
@@ -375,21 +383,25 @@ with tab2:
                         y_test = y_test[zero_day_mask]
                         original_labels = original_labels[zero_day_mask]
                     
+                    # Convert to numpy arrays for model prediction
+                    X_test_array = X_test.values if hasattr(X_test, 'values') else X_test
+                    y_test_array = y_test.values if hasattr(y_test, 'values') else y_test
+                    
                     # Make predictions
                     model = st.session_state.model
-                    predictions = model.predict(X_test)
-                    anomaly_scores = model.get_anomaly_score(X_test)
+                    predictions = model.predict(X_test_array)
+                    anomaly_scores = model.get_anomaly_score(X_test_array)
                     
                     # Evaluate using zero-day specific metrics
                     evaluation_results = zero_day_filter.evaluate_zero_day_detection(
-                        y_test, predictions, original_labels
+                        y_test_array, predictions, original_labels
                     )
                     
                     # Store results
                     st.session_state.zero_day_results = {
                         'predictions': predictions,
                         'anomaly_scores': anomaly_scores,
-                        'true_labels': y_test,
+                        'true_labels': y_test_array,
                         'original_labels': original_labels,
                         'evaluation': evaluation_results,
                         'timestamp': datetime.now()
