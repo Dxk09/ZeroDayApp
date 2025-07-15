@@ -219,25 +219,53 @@ class OCSVMDetector:
         X_normal = X_train[normal_indices]
         X_scaled = self.preprocess_data(X_normal, fit_scaler=True)
         
-        # Create dummy labels for GridSearchCV (all normal)
-        y_dummy = np.ones(len(X_scaled))
+        # Simple approach: try each parameter combination manually
+        best_score = float('-inf')
+        best_params = None
         
-        # Grid search
-        grid_search = GridSearchCV(
-            OneClassSVM(),
-            param_grid,
-            cv=cv,
-            scoring='neg_mean_squared_error',
-            n_jobs=-1
-        )
-        
-        grid_search.fit(X_scaled, y_dummy)
+        # Iterate through parameter combinations
+        for kernel in param_grid['kernel']:
+            for nu in param_grid['nu']:
+                for gamma in param_grid['gamma']:
+                    try:
+                        # Create and fit model
+                        temp_model = OneClassSVM(kernel=kernel, nu=nu, gamma=gamma)
+                        temp_model.fit(X_scaled)
+                        
+                        # Score based on decision function scores
+                        scores = temp_model.decision_function(X_scaled)
+                        score = np.mean(scores)  # Higher mean score is better
+                        
+                        if score > best_score:
+                            best_score = score
+                            best_params = {'kernel': kernel, 'nu': nu, 'gamma': gamma}
+                    except:
+                        continue  # Skip invalid parameter combinations
         
         # Update model with best parameters
-        self.kernel = grid_search.best_params_['kernel']
-        self.nu = grid_search.best_params_['nu']
-        self.gamma = grid_search.best_params_['gamma']
-        self.model = grid_search.best_estimator_
-        self.is_fitted = True
+        if best_params:
+            self.kernel = best_params['kernel']
+            self.nu = best_params['nu']
+            self.gamma = best_params['gamma']
+            self.model = OneClassSVM(kernel=self.kernel, nu=self.nu, gamma=self.gamma)
+            
+            # Retrain with best parameters
+            self.model.fit(X_scaled)
+            self.is_fitted = True
+            
+            # Update training stats
+            self.training_stats = {
+                'n_support_vectors': self.model.n_support_,
+                'support_vector_ratio': self.model.n_support_ / len(X_scaled),
+                'normal_samples_used': len(X_scaled),
+                'total_samples_available': len(X_train)
+            }
+        else:
+            # Fallback to default parameters
+            self.model = OneClassSVM(kernel='rbf', nu=0.1, gamma='scale')
+            self.model.fit(X_scaled)
+            self.is_fitted = True
+            best_params = {'kernel': 'rbf', 'nu': 0.1, 'gamma': 'scale'}
+            best_score = 0.0
         
-        return grid_search.best_params_, grid_search.best_score_
+        return best_params, best_score
