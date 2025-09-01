@@ -1,0 +1,29 @@
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.DS_Store
+.env
+.env.*
+.venv/
+venv/
+ENV/
+.build/
+dist/
+build/
+*.egg-info/
+.ipynb_checkpoints/
+# PyCharm/JetBrains:
+.idea/
+# Data / artifacts (customize these):
+data/
+datasets/
+models/
+checkpoints/
+logs/
+# Cache:
+.cache/
+.mypy_cache/
+.pytype/
+.pytest_cache/
+
