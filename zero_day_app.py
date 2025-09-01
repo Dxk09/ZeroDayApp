@@ -5,8 +5,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
+from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve, precision_recall_curve, auc
 import sys
 import os
 
@@ -96,30 +96,31 @@ if page == "🧠 ANN (Artificial Neural Network)":
                             kdd_train = kdd_train.drop('difficulty', axis=1)  # Remove difficulty column
                             filtered_train = zero_day_filter.filter_training_data(kdd_train)
                             
-                            # Preprocessing
-                            X = filtered_train.drop('attack_type', axis=1)
+                            # Preprocessing with one-hot encoding for categoricals
+                            X_df = filtered_train.drop('attack_type', axis=1)
                             y_original = filtered_train['attack_type']
-                            
-                            # Encode categorical features
-                            label_encoders = {}
-                            for col in X.select_dtypes(include=['object']).columns:
-                                le = LabelEncoder()
-                                X[col] = le.fit_transform(X[col].astype(str))
-                                label_encoders[col] = le
+                            categorical_cols = list(X_df.select_dtypes(include=['object']).columns)
+                            numeric_cols = [c for c in X_df.columns if c not in categorical_cols]
+                            ohe = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+                            X_cat = ohe.fit_transform(X_df[categorical_cols]) if categorical_cols else np.empty((len(X_df),0))
+                            X_num = X_df[numeric_cols].values.astype(float) if numeric_cols else np.empty((len(X_df),0))
+                            X_encoded = np.hstack([X_num, X_cat])
                             
                             # Create binary labels
                             y = (y_original != 'normal').astype(int)
                             
-                            # Store training data with ANN prefix to avoid conflicts
+                            # Store training data
                             st.session_state.ann_training_data = {
-                                'X': X,
-                                'y': y,
+                                'X': X_encoded,
+                                'y': y.values if hasattr(y, 'values') else np.asarray(y),
                                 'original_labels': y_original,
-                                'label_encoders': label_encoders
+                                'onehot_encoder': ohe,
+                                'categorical_cols': categorical_cols,
+                                'numeric_cols': numeric_cols
                             }
                             
                             st.success("✅ KDDTrain+ dataset loaded successfully!")
-                            st.write(f"**Dataset Info:** {len(X):,} samples, {len(X.columns)} features")
+                            st.write(f"**Dataset Info:** {X_encoded.shape[0]:,} samples, {X_encoded.shape[1]} features")
                             st.write(f"**Attack Rate:** {np.mean(y):.2%}")
                             
                             # Debug info
@@ -160,8 +161,8 @@ if page == "🧠 ANN (Artificial Neural Network)":
                 val_split = st.slider("Validation Split", 0.1, 0.3, 0.2, key="ann_val_split")
                 
                 st.write("**Training Info:**")
-                st.write(f"Features: {len(st.session_state.ann_training_data['X'].columns)}")
-                st.write(f"Samples: {len(st.session_state.ann_training_data['X']):,}")
+                st.write(f"Features: {st.session_state.ann_training_data['X'].shape[1]}")
+                st.write(f"Samples: {st.session_state.ann_training_data['X'].shape[0]:,}")
                 st.write(f"Attack Rate: {np.mean(st.session_state.ann_training_data['y']):.2%}")
             
             if st.button("🎯 Train ANN Model", type="primary", key="ann_train"):
@@ -176,11 +177,11 @@ if page == "🧠 ANN (Artificial Neural Network)":
                         X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=1-train_split, random_state=42)
                         X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
                         
-                        # Convert to numpy arrays
-                        X_train_array = X_train.values
-                        y_train_array = y_train.values
-                        X_val_array = X_val.values
-                        y_val_array = y_val.values
+                        # Convert to numpy arrays (already arrays if one-hot encoded)
+                        X_train_array = np.asarray(X_train)
+                        y_train_array = np.asarray(y_train)
+                        X_val_array = np.asarray(X_val)
+                        y_val_array = np.asarray(y_val)
                         
                         # Create and train model
                         model = AnomalyDetectionModel(
@@ -270,27 +271,22 @@ if page == "🧠 ANN (Artificial Neural Network)":
                             # Filter to zero-day attacks
                             filtered_test = zero_day_filter.filter_zero_day_test_data(kdd_test, include_normal=True)
                             
-                            # Preprocess data
-                            X_test = filtered_test.drop('attack_type', axis=1)
+                            # Preprocess data with one-hot encoding
+                            X_test_df = filtered_test.drop('attack_type', axis=1)
                             y_test_original = filtered_test['attack_type']
-                            
-                            # Apply same encoding as training
-                            label_encoders = st.session_state.ann_training_data['label_encoders']
-                            for col in X_test.select_dtypes(include=['object']).columns:
-                                if col in label_encoders:
-                                    le = label_encoders[col]
-                                    X_test[col] = X_test[col].astype(str)
-                                    X_test[col] = X_test[col].apply(lambda x: x if x in le.classes_ else le.classes_[0])
-                                    X_test[col] = le.transform(X_test[col])
-                                else:
-                                    X_test[col] = 0
+                            ohe = st.session_state.ann_training_data['onehot_encoder']
+                            cat_cols = st.session_state.ann_training_data['categorical_cols']
+                            num_cols = st.session_state.ann_training_data['numeric_cols']
+                            X_cat = ohe.transform(X_test_df[cat_cols]) if cat_cols else np.empty((len(X_test_df),0))
+                            X_num = X_test_df[num_cols].values.astype(float) if num_cols else np.empty((len(X_test_df),0))
+                            X_test = np.hstack([X_num, X_cat])
                             
                             # Create binary labels
                             y_test_binary = (y_test_original != 'normal').astype(int)
                             
                             # Make predictions using ANN
                             model = st.session_state.ann_model
-                            X_test_array = X_test.values
+                            X_test_array = X_test
                             predictions = model.predict(X_test_array)
                             anomaly_scores = model.get_anomaly_score(X_test_array)
                             
@@ -357,6 +353,36 @@ if page == "🧠 ANN (Artificial Neural Network)":
             with col3:
                 st.metric("Recall", f"{evaluation['overall']['recall']:.3f}")
 
+            # ROC, PR curves and exports for ANN
+            y_true = results.get('true_labels')
+            y_scores = results.get('anomaly_scores')
+            if y_scores is not None and y_true is not None:
+                fpr, tpr, _ = roc_curve(y_true, y_scores)
+                precision, recall, _ = precision_recall_curve(y_true, y_scores)
+                auc_roc = auc(fpr, tpr)
+                auc_pr = auc(recall, precision)
+
+                st.markdown("---")
+                st.subheader("📈 ROC & PR Curves")
+                roc_fig = go.Figure()
+                roc_fig.add_trace(go.Scatter(x=fpr, y=tpr, mode='lines', name=f'ROC AUC={auc_roc:.3f}'))
+                roc_fig.add_trace(go.Scatter(x=[0,1], y=[0,1], mode='lines', name='Chance', line=dict(dash='dash')))
+                roc_fig.update_layout(xaxis_title='FPR', yaxis_title='TPR', title='ROC Curve')
+                st.plotly_chart(roc_fig, use_container_width=True)
+
+                pr_fig = go.Figure()
+                pr_fig.add_trace(go.Scatter(x=recall, y=precision, mode='lines', name=f'PR AUC={auc_pr:.3f}'))
+                pr_fig.update_layout(xaxis_title='Recall', yaxis_title='Precision', title='Precision-Recall Curve')
+                st.plotly_chart(pr_fig, use_container_width=True)
+
+                export_df = pd.DataFrame({
+                    'anomaly_probability': y_scores,
+                    'predicted_label': results['predictions'],
+                    'true_label': results['true_labels'],
+                    'original_attack_type': results['original_labels']
+                })
+                st.download_button('⬇️ Download ANN Predictions (CSV)', data=export_df.to_csv(index=False), file_name='ann_predictions.csv', mime='text/csv')
+
 elif page == "🎯 OCSVM (One-Class SVM)":
     st.header("🎯 OCSVM Zero-Day Detection")
     st.markdown("**Train OCSVM on Normal Traffic → Test against Zero-Day Attacks from KDDTest+**")
@@ -367,7 +393,6 @@ elif page == "🎯 OCSVM (One-Class SVM)":
     with tab1:
         st.subheader("📚 Step 1: Train OCSVM on Normal Traffic")
         st.markdown("Train your One-Class SVM on normal traffic patterns from KDDTrain+")
-        
         col1, col2 = st.columns([2, 1])
         
         with col1:
@@ -397,32 +422,33 @@ elif page == "🎯 OCSVM (One-Class SVM)":
                             # Filter to known attacks only
                             filtered_train = zero_day_filter.filter_training_data(kdd_train)
                             
-                            # Preprocess data
-                            X = filtered_train.drop('attack_type', axis=1)
+                            # Preprocess data with one-hot encoding
+                            X_df = filtered_train.drop('attack_type', axis=1)
                             y = filtered_train['attack_type']
-                            
-                            # Encode categorical features
-                            label_encoders = {}
-                            for col in X.select_dtypes(include=['object']).columns:
-                                le = LabelEncoder()
-                                X[col] = le.fit_transform(X[col].astype(str))
-                                label_encoders[col] = le
+                            categorical_cols = list(X_df.select_dtypes(include=['object']).columns)
+                            numeric_cols = [c for c in X_df.columns if c not in categorical_cols]
+                            ohe = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+                            X_cat = ohe.fit_transform(X_df[categorical_cols]) if categorical_cols else np.empty((len(X_df),0))
+                            X_num = X_df[numeric_cols].values.astype(float) if numeric_cols else np.empty((len(X_df),0))
+                            X_encoded = np.hstack([X_num, X_cat])
                             
                             # Create binary labels (0=normal, 1=attack)
                             y_binary = (y != 'normal').astype(int)
                             
                             # Store training data
                             st.session_state.ocsvm_training_data = {
-                                'X': X,
-                                'y': y_binary,
+                                'X': X_encoded,
+                                'y': y_binary.values if hasattr(y_binary, 'values') else np.asarray(y_binary),
                                 'original_labels': y,
-                                'label_encoders': label_encoders
+                                'onehot_encoder': ohe,
+                                'categorical_cols': categorical_cols,
+                                'numeric_cols': numeric_cols
                             }
                             
                             st.success("✅ KDDTrain+ dataset loaded successfully!")
-                            st.write(f"**Dataset Info:** {len(X):,} samples, {len(X.columns)} features")
-                            normal_samples = len(X) - np.sum(y_binary)
-                            st.write(f"**Normal Samples:** {normal_samples:,}")
+                            st.write(f"**Dataset Info:** {X_encoded.shape[0]:,} samples, {X_encoded.shape[1]} features")
+                            normal_samples = X_encoded.shape[0] - np.sum(y_binary)
+                            st.write(f"**Normal Samples:** {int(normal_samples):,}")
                             st.write(f"**Normal Rate:** {(1 - np.mean(y_binary)):.2%}")
                             
                         else:
@@ -452,9 +478,9 @@ elif page == "🎯 OCSVM (One-Class SVM)":
                 optimize_params = st.checkbox("Optimize Hyperparameters", value=False, key="ocsvm_optimize")
                 
                 st.write("**Training Info:**")
-                st.write(f"Features: {len(st.session_state.ocsvm_training_data['X'].columns)}")
-                st.write(f"Total Samples: {len(st.session_state.ocsvm_training_data['X']):,}")
-                normal_samples = len(st.session_state.ocsvm_training_data['X']) - np.sum(st.session_state.ocsvm_training_data['y'])
+                st.write(f"Features: {st.session_state.ocsvm_training_data['X'].shape[1]}")
+                st.write(f"Total Samples: {st.session_state.ocsvm_training_data['X'].shape[0]:,}")
+                normal_samples = st.session_state.ocsvm_training_data['X'].shape[0] - np.sum(st.session_state.ocsvm_training_data['y'])
                 st.write(f"Normal Samples: {normal_samples:,}")
                 st.write(f"Normal Rate: {(1 - np.mean(st.session_state.ocsvm_training_data['y'])):.2%}")
             
@@ -465,9 +491,9 @@ elif page == "🎯 OCSVM (One-Class SVM)":
                         X = st.session_state.ocsvm_training_data['X']
                         y = st.session_state.ocsvm_training_data['y']
                         
-                        # Convert to numpy arrays
-                        X_array = X.values
-                        y_array = y.values
+                        # Convert to numpy arrays (already arrays if one-hot encoded)
+                        X_array = np.asarray(X)
+                        y_array = np.asarray(y)
                         
                         # Create OCSVM model
                         model = OCSVMDetector(kernel=kernel, nu=nu, gamma=gamma)
@@ -558,27 +584,22 @@ elif page == "🎯 OCSVM (One-Class SVM)":
                             # Filter to zero-day attacks
                             filtered_test = zero_day_filter.filter_zero_day_test_data(kdd_test, include_normal=True)
                             
-                            # Preprocess data
-                            X_test = filtered_test.drop('attack_type', axis=1)
+                            # Preprocess data with one-hot encoding
+                            X_test_df = filtered_test.drop('attack_type', axis=1)
                             y_test_original = filtered_test['attack_type']
-                            
-                            # Apply same encoding as training
-                            label_encoders = st.session_state.ocsvm_training_data['label_encoders']
-                            for col in X_test.select_dtypes(include=['object']).columns:
-                                if col in label_encoders:
-                                    le = label_encoders[col]
-                                    X_test[col] = X_test[col].astype(str)
-                                    X_test[col] = X_test[col].apply(lambda x: x if x in le.classes_ else le.classes_[0])
-                                    X_test[col] = le.transform(X_test[col])
-                                else:
-                                    X_test[col] = 0
+                            ohe = st.session_state.ocsvm_training_data['onehot_encoder']
+                            cat_cols = st.session_state.ocsvm_training_data['categorical_cols']
+                            num_cols = st.session_state.ocsvm_training_data['numeric_cols']
+                            X_cat = ohe.transform(X_test_df[cat_cols]) if cat_cols else np.empty((len(X_test_df),0))
+                            X_num = X_test_df[num_cols].values.astype(float) if num_cols else np.empty((len(X_test_df),0))
+                            X_test = np.hstack([X_num, X_cat])
                             
                             # Create binary labels
                             y_test_binary = (y_test_original != 'normal').astype(int)
                             
                             # Make predictions using OCSVM
                             model = st.session_state.ocsvm_model
-                            X_test_array = X_test.values
+                            X_test_array = X_test
                             predictions, anomaly_scores = model.predict_binary(X_test_array, return_probabilities=True)
                             
                             # Evaluate using zero-day specific metrics
@@ -654,10 +675,60 @@ elif page == "🎯 OCSVM (One-Class SVM)":
             with col3:
                 st.metric("Recall", f"{evaluation['overall']['recall']:.3f}")
             
+            # Threshold tuning for OCSVM
+            st.markdown("---")
+            st.subheader("🔧 Threshold Tuning (OCSVM)")
+            scores = results.get('anomaly_scores')
+            if scores is not None:
+                thr = st.slider("Anomaly threshold", 0.0, 1.0, 0.5, 0.01, key="ocsvm_threshold")
+                y_true_thr = results['true_labels']
+                y_pred_adj = (scores >= thr).astype(int)
+                eval_adj = zero_day_filter.evaluate_zero_day_detection(y_true_thr, y_pred_adj, results['original_labels'])
+                cols = st.columns(4)
+                with cols[0]:
+                    st.metric("Adj Accuracy", f"{eval_adj['overall']['accuracy']:.3f}")
+                with cols[1]:
+                    st.metric("Adj Precision", f"{eval_adj['overall']['precision']:.3f}")
+                with cols[2]:
+                    st.metric("Adj Recall", f"{eval_adj['overall']['recall']:.3f}")
+                with cols[3]:
+                    st.metric("Adj F1", f"{eval_adj['overall']['f1_score']:.3f}")
+
+            # ROC and PR curves + export for OCSVM
+            y_true_plot = results['true_labels']
+            y_scores_plot = results.get('anomaly_scores')
+            if y_scores_plot is not None:
+                fpr, tpr, _ = roc_curve(y_true_plot, y_scores_plot)
+                precision, recall, _ = precision_recall_curve(y_true_plot, y_scores_plot)
+                auc_roc = auc(fpr, tpr)
+                auc_pr = auc(recall, precision)
+
+                st.markdown("---")
+                st.subheader("📈 ROC & PR Curves")
+                roc_fig = go.Figure()
+                roc_fig.add_trace(go.Scatter(x=fpr, y=tpr, mode='lines', name=f'ROC AUC={auc_roc:.3f}'))
+                roc_fig.add_trace(go.Scatter(x=[0,1], y=[0,1], mode='lines', name='Chance', line=dict(dash='dash')))
+                roc_fig.update_layout(xaxis_title='FPR', yaxis_title='TPR', title='ROC Curve')
+                st.plotly_chart(roc_fig, use_container_width=True)
+
+                pr_fig = go.Figure()
+                pr_fig.add_trace(go.Scatter(x=recall, y=precision, mode='lines', name=f'PR AUC={auc_pr:.3f}'))
+                pr_fig.update_layout(xaxis_title='Recall', yaxis_title='Precision', title='Precision-Recall Curve')
+                st.plotly_chart(pr_fig, use_container_width=True)
+
+                export_df = pd.DataFrame({
+                    'anomaly_probability': y_scores_plot,
+                    'predicted_label': results['predictions'],
+                    'true_label': results['true_labels'],
+                    'original_attack_type': results['original_labels']
+                })
+                st.download_button('⬇️ Download OCSVM Predictions (CSV)', data=export_df.to_csv(index=False), file_name='ocsvm_predictions.csv', mime='text/csv')
+
             # Show attack-specific results
             st.subheader("📋 Attack-Specific Results")
             
-            attack_results = evaluation['attack_specific']
+            # evaluation uses 'by_attack_type' for per-attack metrics
+            attack_results = evaluation.get('by_attack_type', {})
             attack_df = pd.DataFrame([
                 {
                     'Attack Type': attack,

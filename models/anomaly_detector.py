@@ -5,9 +5,10 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, f1_score
 import pickle
 import os
+import copy
 
 class CyberSecurityDataset(Dataset):
     """Custom dataset class for cybersecurity data"""
@@ -65,6 +66,7 @@ class AnomalyDetectionModel:
         self.model.to(self.device)
         self.scaler = StandardScaler()
         self.is_fitted = False
+        self.decision_threshold = 0.5
         self.training_history = {
             'train_loss': [],
             'val_loss': [],
@@ -98,19 +100,24 @@ class AnomalyDetectionModel:
             val_dataset = CyberSecurityDataset(X_val_scaled, y_val)
             val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
         
-        # Calculate class weights for balanced training
-        unique, counts = np.unique(y_train, return_counts=True)
-        class_weights = torch.tensor([1.0 / counts[i] for i in range(len(unique))], dtype=torch.float32)
-        class_weights = class_weights / class_weights.sum()  # Normalize
+        # Calculate class weights for balanced training (robust to missing classes)
+        y_train_np = np.asarray(y_train)
+        count_pos = np.sum(y_train_np == 1)
+        count_neg = np.sum(y_train_np == 0)
+        if count_pos > 0 and count_neg > 0:
+            pos_weight_value = float(count_neg) / float(count_pos)
+        else:
+            pos_weight_value = 1.0
         
         # Define loss and optimizer with class weighting
-        pos_weight = torch.tensor([class_weights[1] / class_weights[0]], dtype=torch.float32).to(self.device)
+        pos_weight = torch.tensor([pos_weight_value], dtype=torch.float32).to(self.device)
         criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         optimizer = optim.AdamW(self.model.parameters(), lr=learning_rate, weight_decay=0.01)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10)
         
         best_val_loss = float('inf')
         patience_counter = 0
+        best_state = None
         
         self.training_history = {
             'train_loss': [],
@@ -131,7 +138,7 @@ class AnomalyDetectionModel:
                 features, labels = features.to(self.device), labels.to(self.device)
                 
                 optimizer.zero_grad()
-                outputs = self.model(features).squeeze()
+                outputs = self.model(features).squeeze(1)
                 loss = criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
@@ -156,7 +163,7 @@ class AnomalyDetectionModel:
                 with torch.no_grad():
                     for features, labels in val_loader:
                         features, labels = features.to(self.device), labels.to(self.device)
-                        outputs = self.model(features).squeeze()
+                        outputs = self.model(features).squeeze(1)
                         loss = criterion(outputs, labels)
                         val_loss += loss.item()
                         
@@ -171,6 +178,7 @@ class AnomalyDetectionModel:
                 if avg_val_loss < best_val_loss:
                     best_val_loss = avg_val_loss
                     patience_counter = 0
+                    best_state = copy.deepcopy(self.model.state_dict())
                 else:
                     patience_counter += 1
                     if patience_counter >= patience:
@@ -195,10 +203,38 @@ class AnomalyDetectionModel:
                 progress_callback(epoch + 1, num_epochs, avg_train_loss, avg_val_loss, 
                                 train_accuracy, val_accuracy)
         
+        # Restore best validation weights if available
+        if best_state is not None:
+            self.model.load_state_dict(best_state)
+
+        # If validation set provided, tune decision threshold on it
+        if X_val is not None and y_val is not None:
+            self.model.eval()
+            all_probs = []
+            all_labels = []
+            with torch.no_grad():
+                for features, labels in val_loader:
+                    features = features.to(self.device)
+                    outputs = self.model(features).squeeze(1)
+                    probs = torch.sigmoid(outputs).cpu().numpy()
+                    all_probs.extend(probs)
+                    all_labels.extend(labels.cpu().numpy())
+            all_probs = np.array(all_probs)
+            all_labels = np.array(all_labels)
+            best_thr = 0.5
+            best_f1 = -1.0
+            for thr in np.linspace(0.05, 0.95, 91):
+                preds = (all_probs >= thr).astype(int)
+                f1 = f1_score(all_labels, preds, zero_division=0)
+                if f1 > best_f1:
+                    best_f1 = f1
+                    best_thr = float(thr)
+            self.decision_threshold = best_thr
+
         self.is_fitted = True
         return self.training_history
     
-    def predict(self, X, return_probabilities=False):
+    def predict(self, X, return_probabilities=False, threshold=None):
         """Make predictions on new data"""
         if not self.is_fitted:
             raise ValueError("Model must be trained before making predictions")
@@ -210,16 +246,17 @@ class AnomalyDetectionModel:
         self.model.eval()
         predictions = []
         probabilities = []
+        thr = self.decision_threshold if threshold is None else float(threshold)
         
         with torch.no_grad():
             for features in data_loader:
                 if isinstance(features, tuple):
                     features = features[0]
                 features = features.to(self.device)
-                outputs = self.model(features).squeeze()
+                outputs = self.model(features).squeeze(1)
                 
                 probs = torch.sigmoid(outputs).cpu().numpy()
-                preds = (torch.sigmoid(outputs) > 0.5).float().cpu().numpy()
+                preds = (probs >= thr).astype(float)
                 
                 probabilities.extend(probs)
                 predictions.extend(preds)
